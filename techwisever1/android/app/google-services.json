@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "517912732365",
+    "project_id": "techwisever1",
+    "storage_bucket": "techwisever1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:517912732365:android:858105dd796a6c2121bf84",
+        "android_client_info": {
+          "package_name": "com.example.techwisever1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "517912732365-h40nu5f5oebar3c68supsaal73g86imn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.techwisever1",
+            "certificate_hash": "89e6f69f24b53ce2cb8891bd8fc9e501b858c947"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCB4XSj7iT_wvpctCwJZ1DElf1sKU-VdfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

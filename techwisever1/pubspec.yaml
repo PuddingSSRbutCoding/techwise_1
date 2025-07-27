@@ -1,0 +1,46 @@
+name: techwisever1
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # ✅ เพิ่ม Firebase core สำหรับเชื่อม Firebase
+  firebase_core: ^2.30.0
+
+  # ✅ สำหรับการทำ Authentication (Google, Facebook, Email)
+  firebase_auth: ^4.17.0
+
+  # ✅ สำหรับ Google Sign-In
+  google_sign_in: ^6.2.1
+
+  # ✅ สำหรับ Facebook Login
+  flutter_facebook_auth: ^6.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
