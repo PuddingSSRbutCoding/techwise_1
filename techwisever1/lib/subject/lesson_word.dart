@@ -26,11 +26,11 @@ class LessonIntroPage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
+                      color: Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
                         ),
@@ -52,7 +52,7 @@ class LessonIntroPage extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.asset(
-                            'assets/images/electronic_parts.jpg',
+                            'assets/images/L1.jpg',
                             height: 150,
                             fit: BoxFit.cover,
                           ),
@@ -67,7 +67,7 @@ class LessonIntroPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Image.asset(
-                          'assets/images/resistor.png',
+                          'assets/images/energy.png',
                           height: 80,
                         ),
                         const SizedBox(height: 20),
@@ -104,10 +104,10 @@ class LessonIntroPage extends StatelessWidget {
       // 🔵 BottomNavigationBar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha: 0.9),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

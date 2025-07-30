@@ -1,0 +1,66 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Build APK
+      run: flutter build apk --release
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: techwise-release-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
+    
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/app/outputs/flutter-apk/app-release.apk
+        tag_name: v${{ github.run_number }}
+        name: TechWise Release v${{ github.run_number }}
+        body: |
+          ## TechWise App Release
+          
+          ### What's New
+          - Automated build from GitHub Actions
+          - APK ready for testing
+          
+          ### Installation
+          1. Download the APK file
+          2. Enable "Install from Unknown Sources" on your device
+          3. Install the APK
+          
+          ### Testing Checklist
+          - [ ] Login functionality
+          - [ ] Subject selection
+          - [ ] Lesson viewing
+          - [ ] Offline functionality
+          
+          ### Build Info
+          - Build Number: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Date: ${{ github.event.head_commit.timestamp }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

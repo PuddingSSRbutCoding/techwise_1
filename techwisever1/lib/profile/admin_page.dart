@@ -110,7 +110,7 @@ class AdminOptionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.9),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),

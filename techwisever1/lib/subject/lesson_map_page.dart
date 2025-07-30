@@ -11,7 +11,7 @@ class LessonProgressPage extends StatelessWidget {
           // พื้นหลัง
           SizedBox.expand(
             child: Image.asset(
-              'assets/images/background_lesson.png', // เปลี่ยนตามชื่อไฟล์จริงของคุณ
+              'assets/images/backgroundselect.jpg', // ใช้ไฟล์ที่มีอยู่
               fit: BoxFit.cover,
             ),
           ),
@@ -24,11 +24,11 @@ class LessonProgressPage extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 6,
                   ),
                 ],
@@ -67,12 +67,12 @@ class LessonProgressPage extends StatelessWidget {
             ),
           ),
 
-          // ตัวละครล่างซ้าย-ขวา
+          // ตัวละครล่างซ้าย-ขวา (ใช้รูปที่มีอยู่แทน)
           Positioned(
             bottom: 0,
             left: 10,
             child: Image.asset(
-              'assets/images/char_left.png',
+              'assets/images/TC student.png',
               height: 120,
             ),
           ),
@@ -80,7 +80,7 @@ class LessonProgressPage extends StatelessWidget {
             bottom: 0,
             right: 10,
             child: Image.asset(
-              'assets/images/char_right.png',
+              'assets/images/TC student.png',
               height: 120,
             ),
           ),

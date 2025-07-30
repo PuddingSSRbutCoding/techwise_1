@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import '../services/google_auth_service.dart';
+import '../services/loading_utils.dart';
+import '../services/auth_utils.dart';
 
 import 'login_page1.dart';
 
@@ -88,7 +88,7 @@ class WelcomePage extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => LoginPage()),
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
                       );
                     },
                   ),
@@ -99,67 +99,27 @@ class WelcomePage extends StatelessWidget {
                     imagePath: 'assets/images/google.png',
                     text: 'เข้าสู่ระบบด้วย Google',
                     onTap: () async {
+                      // แสดง loading dialog
+                      LoadingUtils.showLoadingDialog(context);
+
                       try {
-                        final GoogleSignInAccount? googleUser =
-                            await GoogleSignIn().signIn();
-                        if (googleUser == null) return; // user cancelled
-
-                        final googleAuth = await googleUser.authentication;
-
-                        final credential = GoogleAuthProvider.credential(
-                          accessToken: googleAuth.accessToken,
-                          idToken: googleAuth.idToken,
-                        );
-
-                        await FirebaseAuth.instance
-                            .signInWithCredential(credential);
-
-                        Navigator.pushReplacementNamed(context, '/main');
-                      } catch (e) {
-                        print('Google Sign-In Error: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('เกิดข้อผิดพลาดในการเข้าสู่ระบบ Google'),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  // ✅ ปุ่ม Login ด้วย Facebook
-                  buildLoginButton(
-                    imagePath: 'assets/images/facebook_logo.png',
-                    text: 'เข้าสู่ระบบด้วย Facebook',
-                    onTap: () async {
-                      try {
-                        final LoginResult result =
-                            await FacebookAuth.instance.login();
-                        if (result.status == LoginStatus.success) {
-                          final credential = FacebookAuthProvider.credential(
-                            result.accessToken!.token,
-                          );
-
-                          await FirebaseAuth.instance
-                              .signInWithCredential(credential);
-
+                        // ใช้ GoogleAuthService สำหรับการ sign in
+                        final userCredential = await GoogleAuthService.signInWithGoogle();
+                        
+                        // ปิด loading dialog
+                        LoadingUtils.hideLoadingDialog(context);
+                        
+                        // ถ้า login สำเร็จ ให้ไปที่หน้า main โดยไม่ต้องรอ AuthWrapper
+                        if (userCredential != null && context.mounted) {
                           Navigator.pushReplacementNamed(context, '/main');
-                        } else {
-                          print('Facebook login failed: ${result.status}');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('เข้าสู่ระบบ Facebook ไม่สำเร็จ'),
-                            ),
-                          );
                         }
                       } catch (e) {
-                        print('Facebook Sign-In Error: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('เกิดข้อผิดพลาดในการเข้าสู่ระบบ Facebook'),
-                          ),
-                        );
+                        // ปิด loading dialog
+                        LoadingUtils.hideLoadingDialog(context);
+                        
+                        debugPrint('Google Sign-In Error: $e');
+                        // ใช้ AuthUtils สำหรับการแสดง error
+                        AuthUtils.showAuthError(context, e.toString());
                       }
                     },
                   ),
@@ -210,6 +170,7 @@ class WelcomePage extends StatelessWidget {
               style: const TextStyle(
                 color: Colors.black,
                 fontSize: 16,
+                fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
             ),

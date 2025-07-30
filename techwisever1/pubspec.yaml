@@ -16,14 +16,11 @@ dependencies:
   # ✅ เพิ่ม Firebase core สำหรับเชื่อม Firebase
   firebase_core: ^2.30.0
 
-  # ✅ สำหรับการทำ Authentication (Google, Facebook, Email)
+  # ✅ สำหรับการทำ Authentication (Google, Email)
   firebase_auth: ^4.17.0
 
   # ✅ สำหรับ Google Sign-In
   google_sign_in: ^6.2.1
-
-  # ✅ สำหรับ Facebook Login
-  flutter_facebook_auth: ^6.1.1
 
 dev_dependencies:
   flutter_test:
