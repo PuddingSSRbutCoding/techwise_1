@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'auth_utils.dart';
 
 class GoogleAuthService {
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -26,7 +27,14 @@ class GoogleAuthService {
         idToken: googleAuth.idToken,
       );
 
-      return await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      
+      // สร้างข้อมูลผู้ใช้ใน Firestore
+      if (userCredential.user != null) {
+        await AuthUtils.ensureUserExists(userCredential.user!);
+      }
+
+      return userCredential;
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
       rethrow;
@@ -55,7 +63,14 @@ class GoogleAuthService {
         idToken: googleAuth.idToken,
       );
 
-      return await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      
+      // สร้างข้อมูลผู้ใช้ใน Firestore
+      if (userCredential.user != null) {
+        await AuthUtils.ensureUserExists(userCredential.user!);
+      }
+
+      return userCredential;
     } catch (e) {
       debugPrint('Switch Google Account Error: $e');
       rethrow;

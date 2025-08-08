@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
 import 'admin_page.dart';
+import 'user_profile_page.dart';
+import 'settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -141,9 +143,9 @@ class ProfilePage extends StatelessWidget {
                   icon: Icons.person,
                   text: 'ข้อมูลส่วนตัว',
                   onTap: () {
-                    // TODO: ไปยังหน้าข้อมูลส่วนตัว
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const UserProfilePage()),
                     );
                   }
                 ),
@@ -151,9 +153,9 @@ class ProfilePage extends StatelessWidget {
                   icon: Icons.settings,
                   text: 'การตั้งค่า',
                   onTap: () {
-                    // TODO: ไปยังหน้าการตั้งค่า
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsPage()),
                     );
                   }
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'user_service.dart';
 
 class AuthUtils {
   /// ตรวจสอบสถานะการ login และนำทางไปยังหน้าที่เหมาะสม
@@ -48,6 +49,34 @@ class AuthUtils {
           ),
         );
       }
+    }
+  }
+
+  /// สร้างข้อมูลผู้ใช้ใน Firestore เมื่อ login สำเร็จ
+  static Future<void> createUserInFirestore(User user) async {
+    try {
+      await UserService.createOrUpdateUser(
+        uid: user.uid,
+        email: user.email ?? '',
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        role: 'user', // เริ่มต้นเป็นผู้ใช้ทั่วไป
+      );
+    } catch (e) {
+      debugPrint('Create user in Firestore error: $e');
+    }
+  }
+
+  /// ตรวจสอบและสร้างข้อมูลผู้ใช้ถ้ายังไม่มี
+  static Future<void> ensureUserExists(User user) async {
+    try {
+      final userData = await UserService.getUserData(user.uid);
+      if (userData == null) {
+        // สร้างข้อมูลผู้ใช้ใหม่ถ้ายังไม่มี
+        await createUserInFirestore(user);
+      }
+    } catch (e) {
+      debugPrint('Ensure user exists error: $e');
     }
   }
 

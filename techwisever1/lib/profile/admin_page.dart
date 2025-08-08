@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/user_service.dart';
+import 'admin_dashboard_page.dart';
+import 'admin_user_management_page.dart';
 
 class AdminPrivilegePage extends StatelessWidget {
   const AdminPrivilegePage({super.key});
@@ -48,34 +52,68 @@ class AdminPrivilegePage extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          const Text(
-            'นาย กิติ กิจดี',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          FutureBuilder<User?>(
+            future: Future.value(FirebaseAuth.instance.currentUser),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              return Text(
+                user?.displayName ?? user?.email ?? 'ผู้ใช้',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              );
+            },
           ),
 
           const SizedBox(height: 30),
 
-          // 🔵 ปุ่ม: สร้างบทเรียน
+          // 🔵 ปุ่ม: แดชบอร์ดแอดมิน
           AdminOptionButton(
-            icon: Icons.create,
-            label: 'สร้างบทเรียน',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("ไปยังหน้าสร้างบทเรียน")),
-              );
+            icon: Icons.dashboard,
+            label: 'แดชบอร์ดแอดมิน',
+            onTap: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final isAdmin = await UserService.isAdmin(user.uid);
+                if (isAdmin) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คุณไม่มีสิทธิ์เข้าถึงหน้านี้'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
           ),
 
           const SizedBox(height: 16),
 
-          // 🔵 ปุ่ม: ดูคะแนน
+          // 🔵 ปุ่ม: จัดการผู้ใช้
           AdminOptionButton(
-            icon: Icons.bar_chart,
-            label: 'ดูคะแนน',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("ไปยังหน้าดูคะแนน")),
-              );
+            icon: Icons.people,
+            label: 'จัดการผู้ใช้',
+            onTap: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final isAdmin = await UserService.isAdmin(user.uid);
+                if (isAdmin) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminUserManagementPage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คุณไม่มีสิทธิ์เข้าถึงหน้านี้'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],

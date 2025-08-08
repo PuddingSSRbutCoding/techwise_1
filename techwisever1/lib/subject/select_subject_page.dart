@@ -18,13 +18,15 @@ class _SelectSubjectPageState extends State<SelectSubjectPage> {
         children: [
           // 🔵 พื้นหลัง
           SizedBox.expand(
-            child: Image.asset(
-              'assets/images/backgroundselect.jpg',
-              fit: BoxFit.cover,
+            child: Container(
+              child: Image.asset(
+                'assets/images/backgroundselect.jpg',
+                fit: BoxFit.cover,
+              ),
             ),
           ),
 
-          // 🔵 กล่องสีขาวด้านบน (เหมือนขอบด้านล่าง)
+          // 🔵 กล่องด้านบน
           Positioned(
             top: 0,
             left: 0,
@@ -56,11 +58,12 @@ class _SelectSubjectPageState extends State<SelectSubjectPage> {
                     color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
+                  child: Text(
                     'ฉันอยากจะเรียน',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
                 ),
