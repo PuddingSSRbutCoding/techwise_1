@@ -2,15 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
 import 'admin_page.dart';
-<<<<<<< Updated upstream
 import 'user_profile_page.dart';
 import 'settings_page.dart';
-=======
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import '../login/welcome_page.dart';
->>>>>>> Stashed changes
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -146,7 +139,6 @@ class ProfilePage extends StatelessWidget {
                 const SizedBox(height: 30),
 
                 // 🔷 เมนูโปรไฟล์
-<<<<<<< Updated upstream
                 buildProfileMenu(
                   icon: Icons.person,
                   text: 'ข้อมูลส่วนตัว',
@@ -189,33 +181,6 @@ class ProfilePage extends StatelessWidget {
                     );
                   }
                 ),
-=======
-                buildProfileMenu(icon: Icons.settings, text: 'การตั้งค่า', onTap: () {
-                  // TODO: ไปยังหน้าการตั้งค่า
-                }),
-                buildProfileMenu(icon: Icons.logout, text: 'ออกจากระบบ', onTap: () async {
-                  // ✅ ฟังก์ชันออกจากระบบ
-                  await FirebaseAuth.instance.signOut();
-                  try {
-                    await GoogleSignIn().signOut();
-                  } catch (_) {}
-                  try {
-                    await FacebookAuth.instance.logOut();
-                  } catch (_) {}
-                  // กลับไปหน้า WelcomePage
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const WelcomePage()),
-                    (route) => false,
-                  );
-                }),
-                buildProfileMenu(icon: Icons.verified_user, text: 'สิทธิแอดมิน', onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminPrivilegePage()),
-                  );
-                }),
->>>>>>> Stashed changes
 
                 const Spacer(),
                 const Padding(

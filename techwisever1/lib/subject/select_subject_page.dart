@@ -11,22 +11,35 @@ class SelectSubjectPage extends StatefulWidget {
 }
 
 class _SelectSubjectPageState extends State<SelectSubjectPage> {
+  Widget? _currentSubPage;
+
+  @override
+  void didChangeDependencies() {
+    Future.microtask(() {
+      if (_currentSubPage != null) {
+        setState(() {
+          _currentSubPage = null;
+        });
+      }
+    });
+    super.didChangeDependencies();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return _currentSubPage ?? _buildSubjectMenu();
+  }
+
+  Widget _buildSubjectMenu() {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔵 พื้นหลัง
           SizedBox.expand(
-            child: Container(
-              child: Image.asset(
-                'assets/images/backgroundselect.jpg',
-                fit: BoxFit.cover,
-              ),
+            child: Image.asset(
+              'assets/images/backgroundselect.jpg',
+              fit: BoxFit.cover,
             ),
           ),
-
-          // 🔵 กล่องด้านบน
           Positioned(
             top: 0,
             left: 0,
@@ -34,20 +47,18 @@ class _SelectSubjectPageState extends State<SelectSubjectPage> {
             child: Container(
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withOpacity(0.9),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: Colors.black.withOpacity(0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              alignment: Alignment.center
+              alignment: Alignment.center,
             ),
           ),
-
-          // 🔵 เนื้อหา
           SafeArea(
             child: Column(
               children: [
@@ -55,15 +66,14 @@ class _SelectSubjectPageState extends State<SelectSubjectPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withAlpha(153),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
+                  child: const Text(
                     'ฉันอยากจะเรียน',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -77,24 +87,22 @@ class _SelectSubjectPageState extends State<SelectSubjectPage> {
                         title: 'อิเล็กทรอนิกส์',
                         imagePath: 'assets/images/energy.png',
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ElectronicsPage(),
-                            ),
-                          );
+                          setState(() {
+                            _currentSubPage = ElectronicsPage(
+                              onBack: () => setState(() => _currentSubPage = null),
+                            );
+                          });
                         },
                       ),
                       SubjectCard(
                         title: 'เทคนิคคอมพิวเตอร์',
                         imagePath: 'assets/images/hacker.png',
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ComputerTechPage(),
-                            ),
-                          );
+                          setState(() {
+                            _currentSubPage = ComputerTechPage(
+                              onBack: () => setState(() => _currentSubPage = null),
+                            );
+                          });
                         },
                       ),
                     ],

@@ -20,11 +20,11 @@ class SubjectCard extends StatelessWidget {
         width: 140,
         height: 160,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 6,
               offset: const Offset(2, 4),
             )
@@ -37,11 +37,7 @@ class SubjectCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               title,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 16),
               textAlign: TextAlign.center,
             ),
           ],

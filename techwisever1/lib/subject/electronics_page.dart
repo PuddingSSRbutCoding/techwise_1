@@ -1,14 +1,18 @@
+// lib/subject/electronics_page.dart
 import 'package:flutter/material.dart';
-import 'lesson_intro.dart'; // นำเข้าไฟล์หน้าบทเรียน
+import 'lesson_intro.dart'; // ใช้คลาส LessonIntroPageEL
 
 class ElectronicsPage extends StatelessWidget {
-  const ElectronicsPage({super.key});
+  final VoidCallback? onBack;
+
+  const ElectronicsPage({super.key, this.onBack});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
+          // 🔵 พื้นหลัง
           SizedBox.expand(
             child: Image.asset(
               'assets/images/backgroundselect.jpg',
@@ -16,6 +20,7 @@ class ElectronicsPage extends StatelessWidget {
             ),
           ),
 
+          // 🔵 หัวข้อ
           Positioned(
             top: 0,
             left: 0,
@@ -23,14 +28,14 @@ class ElectronicsPage extends StatelessWidget {
             child: Container(
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withOpacity(0.95),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(24),
                   bottomRight: Radius.circular(24),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: Colors.black.withOpacity(0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -40,7 +45,7 @@ class ElectronicsPage extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => onBack?.call(),
                   ),
                   const Expanded(
                     child: Center(
@@ -58,38 +63,60 @@ class ElectronicsPage extends StatelessWidget {
               ),
             ),
           ),
-          //ไปหน้าเริ่มเรียน
+
+          // 🔵 เนื้อหา
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.only(top: 100, bottom: 80),
+              padding: const EdgeInsets.only(top: 100, bottom: 20),
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     LessonCard(
                       title: 'บทที่ 1\nอุปกรณ์อิเล็กทรอนิกส์เบื้องต้น',
                       imagePath: 'assets/images/L1.jpg',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LessonIntroPage()),
-                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LessonIntroPage(
+                              subject: 'electronics',
+                              lesson: 1,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
                     LessonCard(
                       title: 'บทที่ 2\nอุปกรณ์ในงานไฟฟ้า',
                       imagePath: 'assets/images/L2.jpg',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LessonIntroPage()),
-                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LessonIntroPage(
+                              subject: 'electronics',
+                              lesson: 2,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
                     LessonCard(
                       title: 'บทที่ 3\nสัญลักษณ์ทางอิเล็กทรอนิกส์',
                       imagePath: 'assets/images/L3.png',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LessonIntroPage()),
-                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LessonIntroPage(
+                              subject: 'electronics',
+                              lesson: 3,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -97,44 +124,6 @@ class ElectronicsPage extends StatelessWidget {
             ),
           ),
         ],
-      ),
-
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: Colors.black,
-          unselectedItemColor: Colors.black54,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'หน้าหลัก',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'โปรไฟล์',
-            ),
-          ],
-          onTap: (index) {
-            if (index == 0) {
-              Navigator.pop(context);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("ไปยังหน้าโปรไฟล์")),
-              );
-            }
-          },
-        ),
       ),
     );
   }
@@ -163,7 +152,7 @@ class LessonCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
+              color: Colors.black.withOpacity(0.15),
               blurRadius: 6,
               offset: const Offset(0, 3),
             ),
@@ -185,7 +174,7 @@ class LessonCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: Colors.white.withOpacity(0.85),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -204,7 +193,7 @@ class LessonCard extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onTap,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.9),
+                    backgroundColor: Colors.white.withOpacity(0.9),
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

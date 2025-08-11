@@ -5,31 +5,53 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: ^3.8.1
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
-  google_sign_in: ^6.1.6
-  cloud_firestore: ^4.13.6
-  image_picker: ^1.0.4
-  shared_preferences: ^2.2.2
+
+  cupertino_icons: ^1.0.8
+
+  # ✅ เพิ่ม Firebase core สำหรับเชื่อม Firebase
+  firebase_core: ^2.30.0
+
+  # ✅ สำหรับการทำ Authentication (Google, Facebook, Email)
+  firebase_auth: ^4.17.0
+
+  # ✅ สำหรับ Google Sign-In
+  google_sign_in: ^6.2.1
+
+  # ✅ สำหรับ Facebook Login
+  flutter_facebook_auth: ^6.1.1
+
+  cloud_firestore: ^4.17.2
+
+  animate_do: ^3.3.4
+
+  shared_preferences: ^2.2.3
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+
+  flutter_lints: ^5.0.0
+
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
+
   uses-material-design: true
+
   assets:
     - assets/images/
-    - assets/icon/
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"    # หรือรูป: assets/icon/ic_bg.png
+  adaptive_icon_foreground: assets/icon/app_icon.png  # เสนอให้แยก foreground สำหรับ Android
+  remove_alpha_ios: true
+  min_sdk_android: 21
