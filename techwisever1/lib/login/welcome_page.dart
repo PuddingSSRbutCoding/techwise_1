@@ -103,6 +103,7 @@ class WelcomePage extends StatelessWidget {
                       LoadingUtils.showLoadingDialog(context);
 
                       try {
+<<<<<<< Updated upstream
                         // ใช้ GoogleAuthService สำหรับการ sign in
                         final userCredential = await GoogleAuthService.signInWithGoogle();
                         
@@ -111,6 +112,52 @@ class WelcomePage extends StatelessWidget {
                         
                         // ถ้า login สำเร็จ ให้ไปที่หน้า main โดยไม่ต้องรอ AuthWrapper
                         if (userCredential != null && context.mounted) {
+=======
+                        await GoogleSignIn().signOut(); // เพิ่มบรรทัดนี้เพื่อให้เลือกบัญชีใหม่ทุกครั้ง
+                        final GoogleSignInAccount? googleUser =
+                            await GoogleSignIn().signIn();
+                        if (googleUser == null) return; // user cancelled
+
+                        final googleAuth = await googleUser.authentication;
+
+                        final credential = GoogleAuthProvider.credential(
+                          accessToken: googleAuth.accessToken,
+                          idToken: googleAuth.idToken,
+                        );
+
+                        await FirebaseAuth.instance
+                            .signInWithCredential(credential);
+
+                        Navigator.pushReplacementNamed(context, '/main');
+                      } catch (e) {
+                        print('Google Sign-In Error: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('เกิดข้อผิดพลาดในการเข้าสู่ระบบ Google'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ✅ ปุ่ม Login ด้วย Facebook
+                  buildLoginButton(
+                    imagePath: 'assets/images/facebook_logo.png',
+                    text: 'เข้าสู่ระบบด้วย Facebook',
+                    onTap: () async {
+                      try {
+                        final LoginResult result =
+                            await FacebookAuth.instance.login();
+                        if (result.status == LoginStatus.success) {
+                          final credential = FacebookAuthProvider.credential(
+                            result.accessToken!.token,
+                          );
+
+                          await FirebaseAuth.instance
+                              .signInWithCredential(credential);
+
+>>>>>>> Stashed changes
                           Navigator.pushReplacementNamed(context, '/main');
                         }
                       } catch (e) {
