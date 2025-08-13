@@ -28,14 +28,14 @@ class AuthUtils {
     return FirebaseAuth.instance.currentUser;
   }
 
-  /// ออกจากระบบและนำทางไปยังหน้า login
+  /// ออกจากระบบและนำทางไปยังหน้า welcome
   static Future<void> signOutAndNavigate(BuildContext context) async {
     try {
       await FirebaseAuth.instance.signOut();
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/login',
+          '/welcome',
           (route) => false,
         );
       }

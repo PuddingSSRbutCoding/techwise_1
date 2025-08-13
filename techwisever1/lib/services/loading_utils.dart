@@ -1,26 +1,62 @@
 import 'package:flutter/material.dart';
 
 class LoadingUtils {
+  static bool _isDialogOpen = false;
+  
   /// แสดง loading dialog ที่มีประสิทธิภาพ
   static void showLoadingDialog(BuildContext context) {
+    if (_isDialogOpen) return; // ป้องกัน dialog ซ้อน
+    
+    _isDialogOpen = true;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: const Center(
-            child: CircularProgressIndicator(),
+        return PopScope(
+          canPop: false,
+          child: Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: Card(
+                elevation: 8,
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text(
+                        'กำลังดำเนินการ...',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },
-    );
+    ).then((_) {
+      _isDialogOpen = false; // รีเซ็ตสถานะเมื่อปิด dialog
+    });
   }
 
   /// ปิด loading dialog อย่างปลอดภัย
   static void hideLoadingDialog(BuildContext context) {
+    if (!_isDialogOpen) return; // ถ้าไม่มี dialog เปิดอยู่ก็ไม่ต้องทำอะไร
+    
     if (context.mounted && Navigator.canPop(context)) {
-      Navigator.pop(context);
+      try {
+        Navigator.pop(context);
+        _isDialogOpen = false;
+      } catch (e) {
+        debugPrint('Error hiding loading dialog: $e');
+        _isDialogOpen = false; // รีเซ็ตสถานะแม้เกิด error
+      }
+    } else {
+      _isDialogOpen = false; // รีเซ็ตสถานะถ้า context ไม่พร้อมใช้
     }
   }
 

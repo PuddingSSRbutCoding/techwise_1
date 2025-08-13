@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
+import 'edit_profile_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -70,7 +71,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   // ข้อมูลผู้ใช้
                   _buildInfoCard('ชื่อ', user?.displayName ?? 'ไม่ระบุ'),
                   _buildInfoCard('อีเมล', user?.email ?? 'ไม่ระบุ'),
-                  _buildInfoCard('บทบาท', userData?['role'] == 'admin' ? 'แอดมิน' : 'ผู้ใช้'),
+                  _buildInfoCard('บทบาท (ระบบ)', userData?['role'] == 'admin' ? 'แอดมิน' : 'ผู้ใช้'),
+                  _buildInfoCard('บทบาท', userData?['userRole'] ?? 'ไม่ระบุ'),
+                  _buildInfoCard('ระดับชั้น', userData?['grade'] ?? 'ไม่ระบุ'),
+                  _buildInfoCard('สถานที่ศึกษา', userData?['institution'] ?? 'ไม่ระบุ'),
                   _buildInfoCard('วันที่สร้าง', userData?['createdAt'] != null 
                       ? _formatDate(userData!['createdAt'])
                       : 'ไม่ระบุ'),
@@ -84,11 +88,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement edit profile functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้')),
+                      onPressed: () async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfilePage(),
+                          ),
                         );
+                        // ถ้ามีการอัปเดตข้อมูล ให้โหลดข้อมูลใหม่
+                        if (result == true) {
+                          _loadUserData();
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,

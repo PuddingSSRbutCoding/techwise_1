@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.techwisever1">
 
+    <!-- ✅ Required permissions สำหรับ Firebase และ Google/Facebook Auth -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:label="techwisever1"
         android:name="${applicationName}"
@@ -29,6 +33,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            
+        <!-- ✅ Google Sign-In configuration -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
     </application>
 
     <!-- ✅ สำหรับ Android 11+ -->

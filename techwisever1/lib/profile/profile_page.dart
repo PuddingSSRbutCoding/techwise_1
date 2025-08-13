@@ -14,7 +14,7 @@ class ProfilePage extends StatelessWidget {
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/login',
+          '/welcome',
           (route) => false,
         );
       }
@@ -31,14 +31,39 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _switchGoogleAccount(BuildContext context) async {
+    bool isDialogOpen = false;
+    
     try {
-      // แสดง loading indicator
+      // แสดง loading indicator แบบปลอดภัย
+      isDialogOpen = true;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return PopScope(
+            canPop: false,
+            child: Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Card(
+                  elevation: 8,
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          'กำลังเปลี่ยนบัญชี...',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           );
         },
       );
@@ -46,12 +71,14 @@ class ProfilePage extends StatelessWidget {
       // ใช้ GoogleAuthService สำหรับการเปลี่ยนบัญชี
       final userCredential = await GoogleAuthService.switchGoogleAccount();
       
-      // ปิด loading dialog
-      if (context.mounted) {
+      // ปิด loading dialog อย่างปลอดภัย
+      if (context.mounted && isDialogOpen && Navigator.canPop(context)) {
         Navigator.pop(context);
+        isDialogOpen = false;
       }
       
       if (userCredential != null && context.mounted) {
+        // แสดงข้อความสำเร็จ
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('เปลี่ยนบัญชี Google สำเร็จ'),
@@ -59,22 +86,48 @@ class ProfilePage extends StatelessWidget {
             duration: Duration(seconds: 2),
           ),
         );
-        // รีเฟรชหน้า
-        Navigator.pushReplacementNamed(context, '/main');
+        
+        // ลดเวลาการรอลง
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // ไม่ต้อง navigate เองเพราะ AuthGuard จะจัดการให้
+        // AuthGuard จะตรวจสอบ auth state และ navigate อัตโนมัติ
+      } else if (context.mounted) {
+        // ผู้ใช้ยกเลิกการเปลี่ยนบัญชี
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ยกเลิกการเปลี่ยนบัญชี'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       // ปิด loading dialog ถ้ายังเปิดอยู่
-      if (context.mounted && Navigator.canPop(context)) {
+      if (context.mounted && isDialogOpen && Navigator.canPop(context)) {
         Navigator.pop(context);
+        isDialogOpen = false;
       }
       
       debugPrint('Switch Google Account Error: $e');
       if (context.mounted) {
+        String errorMessage = 'เกิดข้อผิดพลาดในการเปลี่ยนบัญชี';
+        if (e.toString().contains('network')) {
+          errorMessage = 'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+        } else if (e.toString().contains('cancelled')) {
+          errorMessage = 'ยกเลิกการเปลี่ยนบัญชี';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาดในการเปลี่ยนบัญชี: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'ลองใหม่',
+              textColor: Colors.white,
+              onPressed: () => _switchGoogleAccount(context),
+            ),
           ),
         );
       }

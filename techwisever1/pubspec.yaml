@@ -11,6 +11,11 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flutter_markdown: ^0.6.18
+  
+
+
+
   cupertino_icons: ^1.0.8
 
   # ✅ เพิ่ม Firebase core สำหรับเชื่อม Firebase
@@ -30,6 +35,9 @@ dependencies:
   animate_do: ^3.3.4
 
   shared_preferences: ^2.2.3
+
+  # ✅ สำหรับการเลือกรูปภาพ
+  image_picker: ^1.0.4
 
 
 dev_dependencies:

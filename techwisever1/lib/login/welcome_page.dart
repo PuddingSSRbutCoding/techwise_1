@@ -108,10 +108,8 @@ class WelcomePage extends StatelessWidget {
                         // ปิด loading dialog
                         LoadingUtils.hideLoadingDialog(context);
                         
-                        // ถ้า login สำเร็จ ให้ไปที่หน้า main โดยไม่ต้องรอ AuthWrapper
-                        if (userCredential != null && context.mounted) {
-                          Navigator.pushReplacementNamed(context, '/main');
-                        }
+                        // ถ้า login สำเร็จ AuthGuard จะจัดการ navigation ให้เอง
+                        // ไม่ต้อง navigate เอง เพื่อป้องกัน loading ค้าง
                       } catch (e) {
                         // ปิด loading dialog
                         LoadingUtils.hideLoadingDialog(context);

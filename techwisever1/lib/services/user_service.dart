@@ -11,17 +11,34 @@ class UserService {
     String? displayName,
     String? photoURL,
     String role = 'user',
+    String? userRole, // ครู-อาจารย์/นักศึกษา
+    String? grade, // ระดับชั้น
+    String? institution, // สถานที่ศึกษา
   }) async {
     try {
-      await _firestore.collection('users').doc(uid).set({
+      final Map<String, dynamic> userData = {
         'uid': uid,
         'email': email,
         'displayName': displayName,
         'photoURL': photoURL,
         'role': role,
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+
+      // เพิ่มข้อมูลเพิ่มเติมถ้ามี
+      if (userRole != null) userData['userRole'] = userRole;
+      if (grade != null) userData['grade'] = grade;
+      if (institution != null) userData['institution'] = institution;
+
+      await _firestore.collection('users').doc(uid).set(userData, SetOptions(merge: true));
+
+      // ถ้าเป็นครั้งแรกที่สร้าง ให้เพิ่ม createdAt
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists || doc.data()?['createdAt'] == null) {
+        await _firestore.collection('users').doc(uid).update({
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       throw Exception('Failed to create/update user: $e');
     }

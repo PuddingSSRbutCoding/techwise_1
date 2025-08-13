@@ -18,8 +18,12 @@
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.techwisever1",
-            "certificate_hash": "BD4433F5C8E8445FC75C02DFDE8594881B15F725"
+            "certificate_hash": "89E6F69F24B53CE2CB8891BD8FC9E501B858C947"
           }
+        },
+        {
+          "client_id": "517912732365-h40nu5f5oebar3c68supsaal73g86imn.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [

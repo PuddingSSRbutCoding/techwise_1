@@ -31,8 +31,18 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+            // ✅ สำหรับการพัฒนา - ใช้ debug key
+        }
         release {
             signingConfig = signingConfigs.getByName("debug")
+            // ⚠️ WARNING: ใช้ debug signing สำหรับ release (เป็นการชั่วคราว)
+            // ในการใช้งานจริง ควรสร้าง release keystore และอัพเดท Firebase certificate hash
+            
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

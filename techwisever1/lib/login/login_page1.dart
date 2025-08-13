@@ -37,12 +37,8 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
       
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-        );
-      }
+      // AuthGuard จะจัดการ navigation อัตโนมัติเมื่อ auth state เปลี่ยน
+      // ไม่ต้อง navigate เอง เพื่อป้องกัน loading ค้าง
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
       
