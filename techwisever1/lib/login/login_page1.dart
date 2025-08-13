@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/main_screen.dart';
 import 'package:techwisever1/login/beforein.dart';
+import '../services/validation_utils.dart';
+import '../services/auth_utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,6 +28,10 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _signInWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ตรวจสอบเครือข่ายก่อน
+    final hasNetwork = await AuthUtils.checkNetworkBeforeAuth(context);
+    if (!hasNetwork) return;
 
     setState(() {
       _isLoading = true;
@@ -226,15 +232,7 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'กรุณากรอกอีเมล';
-                        }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                          return 'กรุณากรอกอีเมลให้ถูกต้อง';
-                        }
-                        return null;
-                      },
+                      validator: ValidationUtils.validateEmail,
                       decoration: InputDecoration(
                         hintText: 'ป้อนที่อยู่อีเมล',
                         filled: true,

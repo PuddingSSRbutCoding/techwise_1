@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../login/welcome_page.dart';
 import '../main_screen.dart';
+import '../services/performance_monitor.dart';
+import '../services/crash_handler.dart';
 
 class AuthGuard extends StatefulWidget {
   const AuthGuard({super.key});
@@ -21,12 +23,23 @@ class _AuthGuardState extends State<AuthGuard> {
   }
 
   Future<void> _initializeAuth() async {
+    PerformanceMonitor.startTimer('AuthGuard_Initialize');
+    
     try {
+      // ตรวจสอบว่าแอปเสถียรหรือไม่
+      final isStable = await CrashHandler.isAppStable();
+      if (!isStable) {
+        debugPrint('🔄 App not stable, performing recovery...');
+        await CrashHandler.resetAppState();
+      }
+      
       // ตรวจสอบสถานะผู้ใช้ปัจจุบันทันที
       _currentUser = FirebaseAuth.instance.currentUser;
       
       // รอ auth state เพียงเล็กน้อย
       await Future.delayed(const Duration(milliseconds: 50));
+      
+      PerformanceMonitor.endTimer('AuthGuard_Initialize');
       
       if (mounted) {
         setState(() {
@@ -34,7 +47,22 @@ class _AuthGuardState extends State<AuthGuard> {
         });
       }
     } catch (e) {
+      PerformanceMonitor.endTimer('AuthGuard_Initialize_Error');
       debugPrint('Auth initialization error: $e');
+      
+      // บันทึก error
+      if (e.toString().isNotEmpty) {
+        // แค่ log ไม่ต้อง await เพื่อไม่ให้ช้า
+        Future.microtask(() async {
+          try {
+            // บันทึก error ใน app state แทน
+            debugPrint('AuthGuard error logged: ${e.toString()}');
+          } catch (_) {
+            // Ignore secondary errors
+          }
+        });
+      }
+      
       if (mounted) {
         setState(() {
           _isInitializing = false;
@@ -92,11 +120,16 @@ class _AuthGuardState extends State<AuthGuard> {
         // ถ้ามีข้อมูลเริ่มต้นหรือได้รับข้อมูลแล้ว แสดงหน้าที่เหมาะสม
         final user = snapshot.data;
         
+        // Debug log เพื่อติดตาม auth state
+        debugPrint('🔐 AuthGuard: User state changed - ${user?.email ?? 'Not logged in'}');
+        
         if (user != null) {
           // ผู้ใช้ login แล้ว -> ไปหน้า main
+          debugPrint('✅ AuthGuard: Navigating to MainScreen for user: ${user.email}');
           return const MainScreen();
         } else {
           // ผู้ใช้ยังไม่ได้ login -> ไปหน้า welcome/login
+          debugPrint('❌ AuthGuard: No user logged in, showing WelcomePage');
           return const WelcomePage();
         }
       },

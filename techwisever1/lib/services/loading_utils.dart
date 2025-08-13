@@ -66,8 +66,8 @@ class LoadingUtils {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return WillPopScope(
-          onWillPop: () async => false,
+        return PopScope(
+          canPop: false,
           child: Center(
             child: Container(
               padding: const EdgeInsets.all(20),

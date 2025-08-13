@@ -24,16 +24,16 @@ dependencies:
   # ✅ สำหรับการทำ Authentication (Google, Facebook, Email)
   firebase_auth: ^4.17.0
 
-  # ✅ สำหรับ Google Sign-In
-  google_sign_in: ^6.2.1
+  # ✅ สำหรับ Google Sign-In (ใช้เวอร์ชันเสถียร)
+  google_sign_in: ^6.1.5
 
-  # ✅ สำหรับ Facebook Login
-  flutter_facebook_auth: ^6.1.1
-
+  # ✅ สำหรับ Firestore database
   cloud_firestore: ^4.17.2
 
+  # ✅ สำหรับ animations
   animate_do: ^3.3.4
 
+  # ✅ สำหรับ local storage
   shared_preferences: ^2.2.3
 
   # ✅ สำหรับการเลือกรูปภาพ

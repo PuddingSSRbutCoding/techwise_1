@@ -38,34 +38,32 @@ class _MainScreenState extends State<MainScreen> {
           _screens[_selectedIndex],
           // Hamburger menu button positioned on top left
           if (_selectedIndex == 0) // แสดงเฉพาะในหน้าหลัก
-            SafeArea(
-              child: Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+            Positioned(
+              top: 16 + MediaQuery.of(context).padding.top, // เพิ่ม safe area padding
+              left: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.black87),
+                  onPressed: () {
+                    // TODO: Implement drawer functionality
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('เมนูจะเปิดใช้งานเร็วๆ นี้'),
+                        duration: Duration(seconds: 2),
                       ),
-                    ],
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.menu, color: Colors.black87),
-                    onPressed: () {
-                      // TODO: Implement drawer functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('เมนูจะเปิดใช้งานเร็วๆ นี้'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
+                    );
+                  },
                 ),
               ),
             ),

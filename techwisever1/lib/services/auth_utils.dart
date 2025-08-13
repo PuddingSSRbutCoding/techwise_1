@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_service.dart';
+import 'network_utils.dart';
 
 class AuthUtils {
   /// ตรวจสอบสถานะการ login และนำทางไปยังหน้าที่เหมาะสม
@@ -80,24 +81,54 @@ class AuthUtils {
     }
   }
 
-  /// แสดงข้อความ error ที่เหมาะสม
-  static void showAuthError(BuildContext context, String error) {
+  /// แสดงข้อความ error ที่เหมาะสม พร้อมตรวจสอบเครือข่าย
+  static Future<void> showAuthError(BuildContext context, String error) async {
     String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+    String? actionText;
+    VoidCallback? action;
     
-    if (error.contains('user-not-found')) {
-      errorMessage = 'ไม่พบบัญชีผู้ใช้นี้';
-    } else if (error.contains('wrong-password')) {
-      errorMessage = 'รหัสผ่านไม่ถูกต้อง';
-    } else if (error.contains('invalid-email')) {
-      errorMessage = 'อีเมลไม่ถูกต้อง';
-    } else if (error.contains('weak-password')) {
-      errorMessage = 'รหัสผ่านอ่อนเกินไป';
-    } else if (error.contains('email-already-in-use')) {
-      errorMessage = 'อีเมลนี้ถูกใช้งานแล้ว';
-    } else if (error.contains('network-request-failed')) {
-      errorMessage = 'ปัญหาในการเชื่อมต่อเครือข่าย';
-    } else if (error.contains('sign_in_failed')) {
-      errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ Google';
+    // ตรวจสอบปัญหาเครือข่ายก่อน
+    if (error.contains('network-request-failed') || 
+        error.contains('NetworkException') || 
+        error.contains('timeout')) {
+      final networkStatus = await NetworkUtils.checkNetworkStatus();
+      errorMessage = NetworkUtils.getNetworkErrorMessage(networkStatus);
+      
+      if (networkStatus != NetworkStatus.connected) {
+        actionText = 'ตรวจสอบอีกครั้ง';
+        action = () async {
+          final newStatus = await NetworkUtils.checkNetworkStatus();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(NetworkUtils.getNetworkErrorMessage(newStatus)),
+                backgroundColor: newStatus == NetworkStatus.connected 
+                    ? Colors.green 
+                    : Colors.orange,
+              ),
+            );
+          }
+        };
+      }
+    } else {
+      // Error messages ปกติ
+      if (error.contains('user-not-found')) {
+        errorMessage = 'ไม่พบบัญชีผู้ใช้นี้\nกรุณาตรวจสอบอีเมลหรือสมัครสมาชิกใหม่';
+      } else if (error.contains('wrong-password')) {
+        errorMessage = 'รหัสผ่านไม่ถูกต้อง\nกรุณาลองใหม่อีกครั้งหรือรีเซ็ตรหัสผ่าน';
+      } else if (error.contains('invalid-email')) {
+        errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง\nกรุณากรอกอีเมลให้ถูกต้อง';
+      } else if (error.contains('weak-password')) {
+        errorMessage = 'รหัสผ่านอ่อนเกินไป\nกรุณาใช้รหัสผ่านที่มีความปลอดภัยมากขึ้น';
+      } else if (error.contains('email-already-in-use')) {
+        errorMessage = 'อีเมลนี้ถูกใช้งานแล้ว\nกรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ';
+      } else if (error.contains('sign_in_failed') || error.contains('ApiException')) {
+        errorMessage = 'การเข้าสู่ระบบ Google ล้มเหลว\nกรุณาตรวจสอบการตั้งค่าหรือลองใหม่อีกครั้ง';
+      } else if (error.contains('too-many-requests')) {
+        errorMessage = 'มีการพยายามเข้าสู่ระบบมากเกินไป\nกรุณารอสักครู่แล้วลองใหม่';
+      } else if (error.contains('user-disabled')) {
+        errorMessage = 'บัญชีผู้ใช้ถูกปิดใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ';
+      }
     }
 
     if (context.mounted) {
@@ -105,9 +136,39 @@ class AuthUtils {
         SnackBar(
           content: Text(errorMessage),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 5),
+          action: actionText != null ? SnackBarAction(
+            label: actionText,
+            textColor: Colors.white,
+            onPressed: action ?? () {},
+          ) : null,
         ),
       );
     }
+  }
+
+  /// ตรวจสอบเครือข่ายก่อนทำ authentication
+  static Future<bool> checkNetworkBeforeAuth(BuildContext context) async {
+    final networkStatus = await NetworkUtils.checkNetworkStatus();
+    
+    if (networkStatus != NetworkStatus.connected) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(NetworkUtils.getNetworkErrorMessage(networkStatus)),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'ลองใหม่',
+              textColor: Colors.white,
+              onPressed: () => checkNetworkBeforeAuth(context),
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+    
+    return true;
   }
 } 

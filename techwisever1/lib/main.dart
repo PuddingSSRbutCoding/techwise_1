@@ -5,9 +5,19 @@ import 'main_screen.dart';
 import 'auth/auth_guard.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'services/crash_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // เริ่มต้น crash handler
+  CrashHandler.initialize();
+  
+  // ตรวจสอบและ handle recovery ถ้าจำเป็น
+  final needsRecovery = await CrashHandler.handleRecovery();
+  if (needsRecovery) {
+    debugPrint('🔄 App recovery performed');
+  }
   
   // เริ่มต้น Firebase แบบ parallel กับการโหลด App
   final firebaseInitFuture = _initializeFirebase();
