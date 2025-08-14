@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
+import '../services/user_service.dart';
 import 'admin_page.dart';
 import 'user_profile_page.dart';
 import 'settings_page.dart';
@@ -28,6 +29,18 @@ class ProfilePage extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<bool> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        return await UserService.isAdmin(user.uid);
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
   }
 
   Future<void> _switchGoogleAccount(BuildContext context) async {
@@ -162,11 +175,20 @@ class ProfilePage extends StatelessWidget {
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.white,
-                  child: CircleAvatar(
-                    radius: 46,
-                    backgroundImage: user?.photoURL != null
-                        ? NetworkImage(user!.photoURL!)
-                        : const AssetImage('assets/images/google.png') as ImageProvider,
+                  child: FutureBuilder<String?>(
+                    future: user != null ? UserService.getUserPhotoURL(user!.uid) : null,
+                    builder: (context, snapshot) {
+                      final photoURL = snapshot.data;
+                      return CircleAvatar(
+                        radius: 46,
+                        backgroundImage: photoURL != null
+                            ? NetworkImage(photoURL)
+                            : null,
+                        child: photoURL == null
+                            ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                            : null,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -224,15 +246,24 @@ class ProfilePage extends StatelessWidget {
                   text: 'ออกจากระบบ',
                   onTap: () => _signOut(context),
                 ),
-                buildProfileMenu(
-                  icon: Icons.verified_user,
-                  text: 'สิทธิแอดมิน',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AdminPrivilegePage()),
-                    );
-                  }
+                // แสดงปุ่มสิทธิแอดมินเฉพาะผู้ดูแลเท่านั้น
+                FutureBuilder<bool>(
+                  future: _checkAdminStatus(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return buildProfileMenu(
+                        icon: Icons.verified_user,
+                        text: 'สิทธิแอดมิน',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminPrivilegePage()),
+                          );
+                        }
+                      );
+                    }
+                    return const SizedBox.shrink(); // ซ่อนปุ่มถ้าไม่ใช่แอดมิน
+                  },
                 ),
 
                 const Spacer(),

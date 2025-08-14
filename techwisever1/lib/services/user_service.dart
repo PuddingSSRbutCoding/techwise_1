@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
 
   /// สร้างหรืออัปเดตข้อมูลผู้ใช้ใน Firestore
   static Future<void> createOrUpdateUser({
@@ -57,10 +60,37 @@ class UserService {
     }
   }
 
+  /// รับ URL รูปโปรไฟล์ของผู้ใช้ (แสดง custom photo ก่อน ถ้าไม่มีจึงแสดง Google photo)
+  static Future<String?> getUserPhotoURL(String uid) async {
+    try {
+      final userData = await getUserData(uid);
+      // ให้ความสำคัญกับรูปที่ผู้ใช้อัปโหลดเองก่อน
+      final customPhotoURL = userData?['customPhotoURL'];
+      if (customPhotoURL != null && customPhotoURL.isNotEmpty) {
+        return customPhotoURL;
+      }
+      // ถ้าไม่มีรูป custom ให้ใช้รูปจาก Google
+      return userData?['photoURL'];
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// ตรวจสอบว่าผู้ใช้เป็นแอดมินหรือไม่
   static Future<bool> isAdmin(String uid) async {
     try {
       final userData = await getUserData(uid);
+      final email = userData?['email'] ?? '';
+      
+      // ตรวจสอบบัญชีพิเศษที่กำหนดเป็น admin โดยตรง
+      if (email == 'techwiseofficialth@gmail.com') {
+        // อัปเดต role เป็น admin ถ้ายังไม่ได้ตั้งค่า
+        if (userData?['role'] != 'admin') {
+          await changeUserRole(uid, 'admin');
+        }
+        return true;
+      }
+      
       return userData?['role'] == 'admin';
     } catch (e) {
       return false;
@@ -107,6 +137,40 @@ class UserService {
       });
     } catch (e) {
       throw Exception('Failed to change user role: $e');
+    }
+  }
+
+  /// อัปโหลดรูปโปรไฟล์ไปยัง Firebase Storage
+  static Future<String> uploadProfileImage(String uid, File imageFile) async {
+    try {
+      final ref = _storage.ref().child('profile_images').child('$uid.jpg');
+      final uploadTask = await ref.putFile(imageFile);
+      final downloadURL = await uploadTask.ref.getDownloadURL();
+      return downloadURL;
+    } catch (e) {
+      throw Exception('Failed to upload profile image: $e');
+    }
+  }
+
+  /// อัปเดตรูปโปรไฟล์ของผู้ใช้
+  static Future<void> updateProfileImage(String uid, File imageFile) async {
+    try {
+      // อัปโหลดรูปไปยัง Storage
+      final photoURL = await uploadProfileImage(uid, imageFile);
+      
+      // อัปเดต photoURL ใน Firestore
+      await _firestore.collection('users').doc(uid).update({
+        'customPhotoURL': photoURL, // ใช้ field แยกต่างหากจาก photoURL ของ Google
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      // อัปเดต photoURL ใน Firebase Auth (ถ้าต้องการ)
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.uid == uid) {
+        await user.updatePhotoURL(photoURL);
+      }
+    } catch (e) {
+      throw Exception('Failed to update profile image: $e');
     }
   }
 } 

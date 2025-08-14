@@ -49,7 +49,16 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
 
   void _goBack() {
     _clearSnackBars();
-    Navigator.pop(context);
+    // ตรวจสอบว่าสามารถ pop กลับได้หรือไม่
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      // ถ้าไม่สามารถ pop ได้ (เพราะใช้ replace มา) ให้ไปหน้าเลือกบทแทน
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainScreen(initialIndex: 0)),
+        (r) => false,
+      );
+    }
   }
 
   void _goHome() {
@@ -205,7 +214,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     return;
   }
   if (!_hide) {
-    await Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => LessonWordPage(
@@ -216,6 +225,11 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
         ),
       ),
     );
+    
+    // ถ้าผู้ใช้กดย้อนกลับจากหน้าเนื้อหา (result เป็น null) ไม่ต้องไปทำแบบทดสอบ
+    if (result == null) {
+      return;
+    }
   }
   final passed = await Navigator.push<bool>(
     context,

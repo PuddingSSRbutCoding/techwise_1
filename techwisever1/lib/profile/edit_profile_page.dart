@@ -18,17 +18,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _institutionController = TextEditingController();
   
   String _selectedUserRole = 'นักศึกษา';
-  String _selectedGrade = 'ปวช.1';
+  String _selectedGrade = 'ม.1';
   File? _selectedImage;
+  String? _currentPhotoURL; // เก็บ photo URL ปัจจุบัน
   bool _isLoading = true;
   bool _isSaving = false;
 
-  final List<String> _userRoles = ['นักศึกษา', 'ครู-อาจารย์'];
+  final List<String> _userRoles = ['ครู-อาจารย์', 'นักศึกษา', 'อื่นๆ'];
   final List<String> _grades = [
+    'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6',
     'ปวช.1', 'ปวช.2', 'ปวช.3',
     'ปวส.1', 'ปวส.2',
-    'ป.ตรี ปี 1', 'ป.ตรี ปี 2', 'ป.ตรี ปี 3', 'ป.ตรี ปี 4',
-    'ป.โท', 'ป.เอก',
     'อื่นๆ'
   ];
 
@@ -51,13 +51,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (user != null) {
       try {
         final userData = await UserService.getUserData(user.uid);
+        final photoURL = await UserService.getUserPhotoURL(user.uid);
         if (mounted) {
           setState(() {
             _nameController.text = userData?['displayName'] ?? user.displayName ?? '';
             _emailController.text = user.email ?? '';
             _selectedUserRole = userData?['userRole'] ?? 'นักศึกษา';
-            _selectedGrade = userData?['grade'] ?? 'ปวช.1';
+            _selectedGrade = userData?['grade'] ?? 'ม.1';
             _institutionController.text = userData?['institution'] ?? '';
+            _currentPhotoURL = photoURL;
             _isLoading = false;
           });
         }
@@ -113,6 +115,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isSaving = true);
 
     try {
+      // อัปโหลดรูปภาพใหม่ถ้ามีการเลือก
+      if (_selectedImage != null) {
+        await UserService.updateProfileImage(user.uid, _selectedImage!);
+      }
+
       // อัปเดต display name ใน Firebase Auth
       if (_nameController.text.isNotEmpty && _nameController.text != user.displayName) {
         await user.updateDisplayName(_nameController.text);
@@ -202,9 +209,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       radius: 60,
                       backgroundImage: _selectedImage != null
                           ? FileImage(_selectedImage!)
-                          : (user?.photoURL != null
-                              ? NetworkImage(user!.photoURL!)
-                              : const AssetImage('assets/images/profile.png') as ImageProvider),
+                          : (_currentPhotoURL != null
+                              ? NetworkImage(_currentPhotoURL!)
+                              : null), // แสดงรูป custom หรือรูป Google
+                      child: _selectedImage == null && _currentPhotoURL == null
+                          ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                          : null,
                     ),
                     Positioned(
                       bottom: 0,

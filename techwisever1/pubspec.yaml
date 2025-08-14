@@ -30,6 +30,9 @@ dependencies:
   # ✅ สำหรับ Firestore database
   cloud_firestore: ^4.17.2
 
+  # ✅ สำหรับ Firebase Storage (อัปโหลดรูปภาพ)
+  firebase_storage: ^11.7.0
+
   # ✅ สำหรับ animations
   animate_do: ^3.3.4
 

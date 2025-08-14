@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'package:techwisever1/services/progress_service.dart';
 
 class QuestionTC1Page extends StatefulWidget {
@@ -54,6 +55,13 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   int _index = 0;
   int _score = 0;
   int _selected = -1;
+  
+  // Timer variables
+  Timer? _timer;
+  int _secondsElapsed = 0;
+  
+  // Navigation history for back button
+  List<int> _selectedHistory = [];
 
   static const double _passRate = 0.60; // ผ่านที่ 60%
 
@@ -61,6 +69,29 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   void initState() {
     super.initState();
     _load();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _secondsElapsed++;
+        });
+      }
+    });
+  }
+
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   // สร้าง docId ให้ตรงกับหลังบ้านของคุณ
@@ -284,6 +315,9 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       return;
     }
 
+    // เก็บประวัติการเลือกคำตอบสำหรับปุ่มกลับ
+    _selectedHistory.add(_selected);
+
     // ประเมินคำตอบโดยไม่เฉลยทันที
     final item = quiz.items[_index];
     if (_selected == item.correctIndex) _score++;
@@ -295,6 +329,20 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       });
     } else {
       _finishQuiz();
+    }
+  }
+
+  void _onPrevious() {
+    if (_index > 0 && _selectedHistory.isNotEmpty) {
+      setState(() {
+        _index--;
+        // กู้คืนการเลือกของข้อก่อนหน้า
+        _selected = _selectedHistory.removeLast();
+        // ลดคะแนนถ้าข้อนั้นถูกต้อง (เพราะเราจะให้ทำใหม่)
+        final quiz = _quiz!;
+        final item = quiz.items[_index];
+        if (_selected == item.correctIndex) _score--;
+      });
     }
   }
 
@@ -321,6 +369,8 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
                 _index = 0;
                 _score = 0;
                 _selected = -1;
+                _selectedHistory.clear();
+                _secondsElapsed = 0;
               });
             },
             child: const Text('ทำใหม่'),
@@ -366,6 +416,61 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
                 : Column(
                     children: [
                       const SizedBox(height: 8),
+                      
+                      // Top row with timer (left) and progress (right)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Timer (top left)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.timer, color: Colors.white, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatTime(_secondsElapsed),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Progress indicator (top right)
+                            if (quiz.items.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                ),
+                                child: Text(
+                                  '${_index + 1}/${quiz.items.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 12),
                       // ป้ายหัว (แคปซูลน้ำเงินเข้ม + ขอบดำ)
                       _TitleCapsule(text: _titleText()),
                       const SizedBox(height: 16),
@@ -399,7 +504,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
                         ),
                       ),
 
-                      // ปุ่มล่าง (ส่งคำตอบเท่านั้น)
+                      // ปุ่มล่าง (กลับ + ส่งคำตอบ)
                       Container(
                         padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
                         decoration: BoxDecoration(
@@ -414,16 +519,47 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
                         ),
                         child: SafeArea(
                           top: false,
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _onSubmit,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          child: Row(
+                            children: [
+                              // Previous button (only show if not first question and has history)
+                              if (_index > 0 && _selectedHistory.isNotEmpty)
+                                Expanded(
+                                  flex: 1,
+                                  child: ElevatedButton(
+                                    onPressed: _onPrevious,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      backgroundColor: Colors.grey[300],
+                                      foregroundColor: Colors.black87,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.arrow_back_ios, size: 16),
+                                        Text('ก่อนหน้า'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              
+                              // Spacing between buttons
+                              if (_index > 0 && _selectedHistory.isNotEmpty) const SizedBox(width: 12),
+                              
+                              // Submit button
+                              Expanded(
+                                flex: _index > 0 && _selectedHistory.isNotEmpty ? 2 : 1,
+                                child: ElevatedButton(
+                                  onPressed: _onSubmit,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  child: Text(_index < quiz.items.length - 1 ? 'ข้อถัดไป' : 'ส่งคำตอบ'),
+                                ),
                               ),
-                              child: const Text('ส่งคำตอบ'),
-                            ),
+                            ],
                           ),
                         ),
                       ),
