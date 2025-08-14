@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/login/login_page1.dart';
 import 'package:techwisever1/main_screen.dart';
-import '../services/validation_utils.dart';
-import '../services/auth_utils.dart';
 
 class UserInfoFormPage extends StatefulWidget {
   const UserInfoFormPage({super.key});
@@ -35,10 +33,6 @@ class _UserInfoFormPageState extends State<UserInfoFormPage> {
 
   Future<void> _createUserWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // ตรวจสอบเครือข่ายก่อน
-    final hasNetwork = await AuthUtils.checkNetworkBeforeAuth(context);
-    if (!hasNetwork) return;
 
     // ตรวจสอบว่ารหัสผ่านตรงกัน
     if (_passwordController.text != _confirmPasswordController.text) {
@@ -74,8 +68,8 @@ class _UserInfoFormPageState extends State<UserInfoFormPage> {
           ),
         );
 
-        // AuthGuard จะจัดการ navigation อัตโนมัติเมื่อ auth state เปลี่ยน
-        // ไม่ต้อง navigate เอง เพื่อป้องกัน loading ค้าง
+        // ✅ เคลียร์ stack ทั้งหมด แล้วเข้า Main (/main)
+        Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'เกิดข้อผิดพลาดในการสร้างบัญชี';
@@ -206,35 +200,74 @@ class _UserInfoFormPageState extends State<UserInfoFormPage> {
                       buildTextField(
                         _nameController, 
                         'ชื่อ-นามสกุล', 
-                        validator: ValidationUtils.validateDisplayName,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกชื่อ-นามสกุล';
+                          }
+                          if (value.length < 2) {
+                            return 'ชื่อ-นามสกุลต้องมีอย่างน้อย 2 ตัวอักษร';
+                          }
+                          return null;
+                        }
                       ),
                       const SizedBox(height: 16),
                       buildTextField(
                         _emailController, 
                         'ที่อยู่อีเมล', 
                         keyboardType: TextInputType.emailAddress,
-                        validator: ValidationUtils.validateEmail,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกอีเมล';
+                          }
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                            return 'กรุณากรอกอีเมลให้ถูกต้อง';
+                          }
+                          return null;
+                        }
                       ),
                       const SizedBox(height: 16),
                       buildTextField(
                         _passwordController, 
                         'รหัสผ่าน', 
                         isPassword: true,
-                        validator: (value) => ValidationUtils.validatePassword(value),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกรหัสผ่าน';
+                          }
+                          if (value.length < 6) {
+                            return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                          }
+                          if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+                            return 'รหัสผ่านต้องมีตัวอักษรและตัวเลข';
+                          }
+                          return null;
+                        }
                       ),
                       const SizedBox(height: 16),
                       buildTextField(
                         _confirmPasswordController, 
                         'ยืนยันรหัสผ่าน', 
                         isPassword: true,
-                        isConfirmPassword: true,
-                        validator: (value) => ValidationUtils.validateConfirmPassword(value, _passwordController.text),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณายืนยันรหัสผ่าน';
+                          }
+                          if (value != _passwordController.text) {
+                            return 'รหัสผ่านไม่ตรงกัน';
+                          }
+                          return null;
+                        }
                       ),
                       const SizedBox(height: 16),
                       buildTextField(
                         _schoolController, 
                         'สถานศึกษา', 
-                        validator: ValidationUtils.validateInstitution,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกสถานศึกษา';
+                          }
+                          return null;
+                        }
                       ),
                       const SizedBox(height: 30),
 
@@ -311,22 +344,15 @@ class _UserInfoFormPageState extends State<UserInfoFormPage> {
     String hint, 
     {
       bool isPassword = false,
-      bool isConfirmPassword = false,
       TextInputType? keyboardType,
       String? Function(String?)? validator,
     }
   ) {
-    // กำหนด obscureText ตาม type ของ field
-    bool obscureText = false;
-    if (isPassword && !isConfirmPassword) {
-      obscureText = _obscurePassword;
-    } else if (isPassword && isConfirmPassword) {
-      obscureText = _obscureConfirmPassword;
-    }
-
     return TextFormField(
       controller: controller,
-      obscureText: obscureText,
+      obscureText: isPassword 
+          ? (isPassword == _obscurePassword ? _obscurePassword : _obscureConfirmPassword)
+          : false,
       keyboardType: keyboardType,
       validator: validator,
       textInputAction: TextInputAction.next,
@@ -343,11 +369,13 @@ class _UserInfoFormPageState extends State<UserInfoFormPage> {
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  obscureText ? Icons.visibility : Icons.visibility_off,
+                  (isPassword == _obscurePassword ? _obscurePassword : _obscureConfirmPassword) 
+                      ? Icons.visibility 
+                      : Icons.visibility_off,
                 ),
                 onPressed: () {
                   setState(() {
-                    if (!isConfirmPassword) {
+                    if (isPassword == _obscurePassword) {
                       _obscurePassword = !_obscurePassword;
                     } else {
                       _obscureConfirmPassword = !_obscureConfirmPassword;

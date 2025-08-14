@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
 import '../services/loading_utils.dart';
 import '../services/auth_utils.dart';
@@ -7,6 +6,11 @@ import 'login_page1.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
+
+  // ✅ ช่วยเคลียร์ stack แล้วเข้า Main เป็นราก
+  void _goMainRoot(BuildContext context) {
+    Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,21 +53,9 @@ class WelcomePage extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             color: Color.fromARGB(255, 0, 54, 148),
                             shadows: [
-                              Shadow(
-                                blurRadius: 10,
-                                color: Colors.white,
-                                offset: Offset(0, 0),
-                              ),
-                              Shadow(
-                                blurRadius: 20,
-                                color: Colors.white,
-                                offset: Offset(0, 0),
-                              ),
-                              Shadow(
-                                blurRadius: 30,
-                                color: Color.fromARGB(255, 156, 184, 241),
-                                offset: Offset(0, 0),
-                              ),
+                              Shadow(blurRadius: 10, color: Colors.white, offset: Offset(0, 0)),
+                              Shadow(blurRadius: 20, color: Colors.white, offset: Offset(0, 0)),
+                              Shadow(blurRadius: 30, color: Color.fromARGB(255, 156, 184, 241), offset: Offset(0, 0)),
                             ],
                           ),
                         ),
@@ -93,72 +85,35 @@ class WelcomePage extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 10),
-                  
-                  // ✅ ปุ่มสำหรับทดสอบ - เข้าสู่หน้า main ทันที (ชั่วคราว)
-                  buildLoginButton(
-                    imagePath: 'assets/images/profile.png',
-                    text: 'ทดสอบเข้าหน้าหลัก (ชั่วคราว)',
-                    onTap: () async {
-                      // สร้างบัญชีทดสอบชั่วคราวด้วยอีเมลและรหัสผ่านเดิม
-                      try {
-                        // ลองล็อกอินด้วยบัญชีทดสอบ
-                        await FirebaseAuth.instance.signInWithEmailAndPassword(
-                          email: 'test@example.com',
-                          password: 'test123',
-                        );
-                      } catch (e) {
-                        // ถ้าไม่มีบัญชี ให้สร้างใหม่
-                        try {
-                          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                            email: 'test@example.com',
-                            password: 'test123',
-                          );
-                          await FirebaseAuth.instance.currentUser?.updateDisplayName('ผู้ทดสอบ');
-                        } catch (e2) {
-                          debugPrint('Test account creation failed: $e2');
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
 
-                  // ✅ ปุ่ม Google Sign-In (เวอร์ชันเรียบง่าย)
+                  // ✅ ปุ่ม Login ด้วย Google
                   buildLoginButton(
                     imagePath: 'assets/images/google.png',
                     text: 'เข้าสู่ระบบด้วย Google',
                     onTap: () async {
-                      // ตรวจสอบเครือข่ายก่อน
-                      final hasNetwork = await AuthUtils.checkNetworkBeforeAuth(context);
-                      if (!hasNetwork) return;
-
                       // แสดง loading dialog
                       LoadingUtils.showLoadingDialog(context);
 
                       try {
-                        // ใช้ GoogleAuthService เวอร์ชันเรียบง่าย
+                        // ใช้ GoogleAuthService สำหรับการ sign in
                         final userCredential = await GoogleAuthService.signInWithGoogle();
-                        
+
                         // ปิด loading dialog
                         LoadingUtils.hideLoadingDialog(context);
-                        
-                        if (userCredential != null) {
-                          // สำเร็จ - AuthGuard จะจัดการ navigation ให้เอง
-                          debugPrint('✅ Google Sign-In successful');
+
+                        // ถ้า login สำเร็จ → เคลียร์สแตกแล้วเข้า Main
+                        if (userCredential != null && context.mounted) {
+                          _goMainRoot(context); // << เปลี่ยนเฉพาะจุดนี้
                         }
                       } catch (e) {
                         // ปิด loading dialog
                         LoadingUtils.hideLoadingDialog(context);
-                        
-                        debugPrint('❌ Google Sign-In failed: $e');
-                        
-                        // แสดงข้อความง่ายๆ
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('ไม่สามารถเข้าสู่ระบบด้วย Google ได้: ${e.toString()}'),
-                            backgroundColor: Colors.red,
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
+
+                        debugPrint('Google Sign-In Error: $e');
+                        // ใช้ AuthUtils สำหรับการแสดง error
+                        if (context.mounted) {
+                          AuthUtils.showAuthError(context, e.toString());
+                        }
                       }
                     },
                   ),

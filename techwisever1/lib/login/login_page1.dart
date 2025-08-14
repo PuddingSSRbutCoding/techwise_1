@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/main_screen.dart';
 import 'package:techwisever1/login/beforein.dart';
-import '../services/validation_utils.dart';
-import '../services/auth_utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,10 +27,6 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _signInWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // ตรวจสอบเครือข่ายก่อน
-    final hasNetwork = await AuthUtils.checkNetworkBeforeAuth(context);
-    if (!hasNetwork) return;
-
     setState(() {
       _isLoading = true;
     });
@@ -42,12 +36,14 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      
-      // AuthGuard จะจัดการ navigation อัตโนมัติเมื่อ auth state เปลี่ยน
-      // ไม่ต้อง navigate เอง เพื่อป้องกัน loading ค้าง
+
+      if (mounted) {
+        // ✅ ล้าง stack แล้วไปหน้า /main (แก้ error เรื่อง Future/Object? → Route)
+        Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+      }
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
-      
+
       switch (e.code) {
         case 'user-not-found':
           errorMessage = 'ไม่พบผู้ใช้นี้ กรุณาตรวจสอบอีเมลหรือสมัครสมาชิกใหม่';
@@ -68,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
           errorMessage = 'ไม่สามารถเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบการเชื่อมต่อ';
           break;
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -106,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _resetPassword() async {
     final email = _emailController.text.trim();
-    
+
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -140,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'เกิดข้อผิดพลาดในการส่งอีเมล';
-      
+
       switch (e.code) {
         case 'user-not-found':
           errorMessage = 'ไม่พบบัญชีผู้ใช้ที่ใช้อีเมลนี้';
@@ -152,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
           errorMessage = 'มีการร้องขอมากเกินไป กรุณาลองใหม่ภายหลัง';
           break;
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -232,7 +228,15 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      validator: ValidationUtils.validateEmail,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกอีเมล';
+                        }
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                          return 'กรุณากรอกอีเมลให้ถูกต้อง';
+                        }
+                        return null;
+                      },
                       decoration: InputDecoration(
                         hintText: 'ป้อนที่อยู่อีเมล',
                         filled: true,

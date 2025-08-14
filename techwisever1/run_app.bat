@@ -12,3 +12,4 @@ echo.
 
 echo [3/3] กำลังเปิดแอป...
 flutter run
+

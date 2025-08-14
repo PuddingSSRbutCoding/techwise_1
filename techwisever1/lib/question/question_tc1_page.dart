@@ -1,7 +1,4 @@
 // lib/question/question_tc1_page.dart
-// แพตช์เฉพาะฝั่งดึง/แปลงข้อมูล (backend parsing) ให้รองรับทั้ง 'options' และ 'option'
-// UI คงเดิมทั้งหมด
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -71,54 +68,6 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
     return 'question${s}$lesson';
   }
 
-  /// Helper: ดึงตัวเลือกจาก map ให้รองรับหลายสคีมา
-  List<String> _parseOptions(Map<String, dynamic> m) {
-    // 1) 'options' เป็น List (คอมพิวเตอร์)
-    final rawOptions = m['options'];
-    if (rawOptions is List) {
-      return rawOptions.map((e) => (e ?? '').toString().trim()).toList();
-    }
-
-    // 2) 'option' เป็น List/Map (อิเล็กทรอนิกส์)
-    final rawOption = m['option'];
-    if (rawOption is List) {
-      return rawOption.map((e) => (e ?? '').toString().trim()).toList();
-    }
-    if (rawOption is Map) {
-      final map = Map<String, dynamic>.from(rawOption);
-      final keys = map.keys.toList()
-        ..sort((a, b) {
-          int toNum(String x) => int.tryParse(x) ?? 0;
-          return toNum(a.toString()).compareTo(toNum(b.toString()));
-        });
-      return keys.map((k) => (map[k] ?? '').toString().trim()).toList();
-    }
-
-    // 3) A/B/C/D แยกคีย์
-    const abcd = ['A', 'B', 'C', 'D'];
-    if (abcd.any((k) => m[k] != null)) {
-      return abcd.map((k) => (m[k] ?? '').toString().trim()).toList();
-    }
-
-    // 4) option1..option4
-    const opt = ['option1', 'option2', 'option3', 'option4'];
-    if (opt.any((k) => m[k] != null)) {
-      return opt.map((k) => (m[k] ?? '').toString().trim()).toList();
-    }
-
-    // 5) answers/choices เป็น List
-    final answers = m['answers'];
-    if (answers is List) {
-      return answers.map((e) => (e ?? '').toString().trim()).toList();
-    }
-    final choices = m['choices'];
-    if (choices is List) {
-      return choices.map((e) => (e ?? '').toString().trim()).toList();
-    }
-
-    return const <String>[];
-  }
-
   /// โหลดข้อสอบจาก Firestore:
   ///  A) questions/{docId}/{docId}-{stage}/level_*   (ตามโครงของคุณ)
   ///  B) ถ้าไม่เจอ → fallback: ค้นใน 'questions' ด้วย lesson+stage (single doc ที่มี list)
@@ -150,26 +99,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
 
           data = {
             'title': 'แบบฝึกหัด',
-            'questions': docs.map((d) {
-              // สำคัญ: ถ้ามี 'option' แต่ไม่มี 'options' ให้แมปให้ทันที
-              final raw = d.data();
-              final map = Map<String, dynamic>.from(raw);
-              if (!map.containsKey('options') && map.containsKey('option')) {
-                final opt = map['option'];
-                if (opt is List) {
-                  map['options'] = opt.map((e) => (e ?? '').toString()).toList();
-                } else if (opt is Map) {
-                  final om = Map<String, dynamic>.from(opt);
-                  final keys = om.keys.toList()
-                    ..sort((a, b) {
-                      int toNum(String x) => int.tryParse(x) ?? 0;
-                      return toNum(a.toString()).compareTo(toNum(b.toString()));
-                    });
-                  map['options'] = keys.map((k) => (om[k] ?? '').toString()).toList();
-                }
-              }
-              return map;
-            }).toList(),
+            'questions': docs.map((d) => d.data()).toList(),
           };
         }
       } catch (_) {}
@@ -188,51 +118,28 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       }
 
       if (data == null) {
-        if (!mounted) return;
         setState(() => _quiz = const _QuizData(title: 'ยังไม่มีข้อสอบสำหรับด่านนี้', items: []));
         return;
       }
 
-      // แปลงเป็นโมเดล (รองรับ option/options)
+      // แปลงเป็นโมเดล
       final title = (data['title'] as String?) ?? 'แบบฝึกหัด';
       final raw = (data['questions'] ?? data['items'] ?? data['qs'] ?? []) as List<dynamic>;
       final items = <_QuizItem>[];
-
       for (final it in raw) {
         if (it is! Map) continue;
         final m = Map<String, dynamic>.from(it as Map);
-
-        final text = (m['question'] ?? m['q'] ?? m['text'] ?? '').toString().trim();
-        var choices = _parseOptions(m);
-
-        // ให้มี 4 ตัวเลือกเสมอ (pad/truncate) เพื่อกัน error UI
-        if (choices.length > 4) {
-          choices = choices.take(4).toList();
-        } else if (choices.length < 4) {
-          choices = [...choices, ...List.filled(4 - choices.length, '')];
-        }
-
+        final text = (m['question'] ?? m['q'] ?? '').toString();
+        final rawChoices = (m['options'] ?? m['choices'] ?? []) as List<dynamic>;
+        final choices = rawChoices.map((e) => e.toString()).toList();
         int correct = 0;
-        final ans = m['answerIndex'] ?? m['answer'] ?? m['ans'] ?? m['correct'];
+        final ans = m['answerIndex'] ?? m['answer'] ?? m['ans'];
         if (ans is int && ans >= 0 && ans < choices.length) {
           correct = ans;
         } else if (ans is String) {
-          // รองรับ 'A'..'D' หรือ index string หรือเทียบกับข้อความตัวเลือก
-          final up = ans.trim().toUpperCase();
-          const mapABCD = {'A': 0, 'B': 1, 'C': 2, 'D': 3};
-          if (mapABCD.containsKey(up)) {
-            correct = mapABCD[up]!;
-          } else {
-            final idxNum = int.tryParse(up);
-            if (idxNum != null && idxNum >= 0 && idxNum < choices.length) {
-              correct = idxNum;
-            } else {
-              final found = choices.indexOf(ans);
-              if (found >= 0) correct = found;
-            }
-          }
+          final idx = choices.indexOf(ans);
+          if (idx >= 0) correct = idx;
         }
-
         items.add(_QuizItem(
           text: text,
           choices: choices,
@@ -241,10 +148,8 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
         ));
       }
 
-      if (!mounted) return;
       setState(() => _quiz = _QuizData(title: title, items: items));
     } catch (e) {
-      if (!mounted) return;
       setState(() => _quiz = const _QuizData(title: 'โหลดข้อมูลผิดพลาด', items: []));
     }
   }
@@ -277,7 +182,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('กรุณาเลือกคำตอบก่อน'),
-          backgroundColor: Color.fromARGB(255, 255, 0, 0),
+          backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
         ),
       );

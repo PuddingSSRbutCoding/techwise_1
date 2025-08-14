@@ -1,95 +1,159 @@
 // lib/question/question_service.dart
+// Patch: บังคับ map['options'] = map['option'] (ถ้ามี) ก่อนส่งเข้า Question.fromMap
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'question_model.dart';
-import 'package:flutter/foundation.dart'; // สำหรับ debugPrint
 
 class QuestionService {
   final FirebaseFirestore db;
   QuestionService({required this.db});
 
-  /// ดึงคำถามตามโครง Firestore ที่ยืดหยุ่น:
-  /// - Computer:
-  ///     /questions/questioncomputer{L}/{questioncomputer{L}-{S}}/level_*
-  ///     /questions/questionscomputer{L}/{questionscomputer{L}-{S}}/level_*
-  /// - Electronics:
-  ///     /questions/questionelec{L}/{questionelec{L}-{S}}/level_*
-  ///     /questions/questionelectronic{L}/{questionelectronic{L}-{S}}/level_*
-  ///     /questions/questionelectronics{L}/{questionelectronics{L}-{S}}/level_*
-  ///   และรูปแบบพิเศษที่คุณใช้:
-  ///     /questions/questionelec{L}/question{L}-{S}/level_*
-  Future<List<Question>> fetchByLessonStage({
-    required String docId,   // ex: questionelec3 หรือ questioncomputer2/3
-    required int setNo,      // 1..N
-    required int lesson,     // เลขบท
-    required int stage,      // = setNo (ไว้แสดงผล/validate)
+  Future<List<Question>> loadQuestions({
+    required String subject, // 'computer' | 'electronics'
+    required int lesson,
+    required int stage,
+    String? docIdOverride,
   }) async {
-    final lower = docId.toLowerCase();
+    final setNo = stage;
 
-    // -------- 1) กำหนดผู้สมัครชื่อ "เอกสารบนสุด" (ไม่ข้ามวิชา) --------
-    late final List<String> docCandidates;
-    if (lower.contains('computer')) {
-      final baseA = 'questioncomputer$lesson';
-      final baseB = 'questionscomputer$lesson';
-      docCandidates = {docId, baseA, baseB}.toList();
-    } else if (lower.contains('elec')) {
-      final baseA = 'questionelec$lesson';
-      final baseB = 'questionelectronic$lesson';
-      final baseC = 'questionelectronics$lesson';
-      docCandidates = {docId, baseA, baseB, baseC}.toList();
-    } else {
-      // กรณีไม่รู้วิชา → ไม่ fallback
-      docCandidates = [docId];
+    final List<String> docCandidates =
+        (docIdOverride != null && docIdOverride.trim().isNotEmpty)
+            ? [docIdOverride.trim()]
+            : _buildDocIdCandidates(subject: subject, lesson: lesson);
+
+    for (final docId in docCandidates) {
+      final subCandidates =
+          _buildSubcollectionCandidates(docId: docId, lesson: lesson, stage: setNo);
+      for (final sub in subCandidates) {
+        final qs = await _tryLoadOne(docId: docId, subcollection: sub);
+        if (qs != null && qs.isNotEmpty) {
+          if (kDebugMode) {
+            debugPrint('[QuestionService] Using path: /questions/$docId/$sub (count=${qs.length})');
+          }
+          return qs;
+        }
+      }
     }
 
-    // ฟังก์ชันผู้ช่วย: ลองโหลดคอลเลกชันหนึ่งชุด
-    Future<List<Question>?> _tryLoad(String d, String sub) async {
-      final col = db.collection('questions').doc(d).collection(sub);
-      try {
-        final snap = await col.orderBy(FieldPath.documentId).get();
-        if (snap.docs.isNotEmpty) {
-          debugPrint('[QS] HIT $d/$sub (${snap.size} docs, ordered)');
-          return snap.docs.map((e) => Question.fromMap(e.data())).toList();
+    throw Exception(
+      'ไม่พบคำถาม subject=$subject lesson=$lesson stage=$stage '
+      'ลองตรวจเส้นทาง: ${docCandidates.map((d) => "/questions/$d/{${d}-$setNo หรือ question$lesson-$setNo}").join(", ")}',
+    );
+  }
+
+  // เข้ากันได้กับโค้ดเดิม
+  Future<List<Question>> fetchByLessonStage({
+    required String subject,
+    required int lesson,
+    required int stage,
+    String? docId,
+    int? setNo,
+  }) {
+    return loadQuestions(
+      subject: subject,
+      lesson: lesson,
+      stage: setNo ?? stage,
+      docIdOverride: docId,
+    );
+  }
+
+  List<String> _buildDocIdCandidates({required String subject, required int lesson}) {
+    final L = lesson;
+    final s = subject.toLowerCase().trim();
+
+    if (s == 'computer' || s == 'com' || s == 'tc' || s == 'tech') {
+      return <String>[
+        'questioncomputer$L',
+        'questionscomputer$L',
+      ];
+    }
+
+    return <String>[
+      'questionelec$L',
+      'questionelectronic$L',
+      'questionelectronics$L',
+      'questionselec$L',
+    ];
+  }
+
+  List<String> _buildSubcollectionCandidates({
+    required String docId,
+    required int lesson,
+    required int stage,
+  }) {
+    final L = lesson;
+    final S = stage;
+    final list = <String>[
+      '$docId-$S',
+      'question$L-$S',
+      '${docId}_$S',
+      '${docId}_S$S',
+    ];
+
+    final seen = <String>{};
+    final dedup = <String>[];
+    for (final v in list) {
+      if (seen.add(v)) dedup.add(v);
+    }
+    return dedup;
+  }
+
+  Future<List<Question>?> _tryLoadOne({
+    required String docId,
+    required String subcollection,
+  }) async {
+    try {
+      final snap = await db
+          .collection('questions')
+          .doc(docId)
+          .collection(subcollection)
+          .get();
+      if (snap.docs.isEmpty) return null;
+
+      final docs = snap.docs.toList()
+        ..sort((a, b) {
+          int num(String id) {
+            final m = RegExp(r'(?:^|[_-])(\d+)$').firstMatch(id);
+            if (m == null) return 0;
+            return int.tryParse(m.group(1) ?? '0') ?? 0;
+          }
+          final na = num(a.id);
+          final nb = num(b.id);
+          if (na != nb) return na.compareTo(nb);
+          return a.id.compareTo(b.id);
+        });
+
+      final out = <Question>[];
+      for (final d in docs) {
+        final raw = d.data();
+        final map = Map<String, dynamic>.from(raw);
+
+        // 🔧 สำคัญ: ถ้ามี 'option' แต่ไม่มี 'options' ให้แมปเป็น 'options'
+        if (!map.containsKey('options') && map.containsKey('option')) {
+          final opt = map['option'];
+
+          if (opt is List) {
+            map['options'] = opt.map((e) => (e ?? '').toString()).toList();
+          } else if (opt is Map) {
+            final om = Map<String, dynamic>.from(opt);
+            final keys = om.keys.toList()
+              ..sort((a, b) {
+                int toNum(String x) => int.tryParse(x) ?? 0;
+                return toNum(a.toString()).compareTo(toNum(b.toString()));
+              });
+            map['options'] = keys.map((k) => (om[k] ?? '').toString()).toList();
+          }
         }
-      } catch (_) {
-        final snap = await col.get();
-        if (snap.docs.isNotEmpty) {
-          debugPrint('[QS] HIT $d/$sub (${snap.size} docs, unordered)');
-          return snap.docs.map((e) => Question.fromMap(e.data())).toList();
-        }
+
+        final q = Question.fromMap(map, id: d.id);
+        if (q.isValid) out.add(q);
+      }
+      return out;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[QuestionService] _tryLoadOne error at /questions/$docId/$subcollection: $e');
       }
       return null;
     }
-
-    // -------- 2) ลองทุก combination ของ docId/subcollection --------
-    for (final d in docCandidates) {
-      final isComputer = d.contains('computer');
-      final isElec = d.contains('elec');
-
-      // ผู้สมัครชื่อ subcollection
-      final subs = <String>{
-        // มาตรฐาน: {docId}-{setNo}
-        '$d-$setNo',
-        // canonical ของแต่ละกลุ่ม (กันกรณี docId ส่งมาไม่ตรง)
-        if (isComputer) 'questioncomputer$lesson-$setNo',
-        if (isComputer) 'questionscomputer$lesson-$setNo',
-        if (isElec) 'questionelec$lesson-$setNo',
-        if (isElec) 'questionelectronic$lesson-$setNo',
-        if (isElec) 'questionelectronics$lesson-$setNo',
-        // เคสพิเศษของอิเล็กฯบท 3 ในโปรเจ็กต์คุณ
-        if (isElec) 'question$lesson-$setNo', // ex: question3-1
-      }.toList();
-
-      for (final sub in subs) {
-        final res = await _tryLoad(d, sub);
-        if (res != null) return res;
-      }
-    }
-
-    // -------- 3) ไม่พบจริง ๆ → โยน error เพื่อ debug --------
-    throw Exception(
-      'ไม่พบคำถาม (lesson=$lesson, stage=$stage) '
-      'ที่ doc: ${docCandidates.join(", ")}; '
-      'ตรวจชื่อ subcollection ให้เป็น {docId}-$setNo หรือ question$lesson-$setNo',
-    );
   }
 }
