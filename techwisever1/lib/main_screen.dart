@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:techwisever1/subject/select_subject_page.dart';
 import 'package:techwisever1/profile/profile_page.dart';
 import 'package:techwisever1/services/app_nav.dart';
+import 'package:techwisever1/services/auth_state_service.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -30,6 +31,14 @@ class _MainScreenState extends State<MainScreen> {
       if (_selectedIndex != v) setState(() => _selectedIndex = v);
     };
     AppNav.bottomIndex.addListener(_navListener);
+    
+    // เริ่มโหลดข้อมูลผู้ใช้ในพื้นหลังหากยังไม่ได้โหลด
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (AuthStateService.instance.userData.value == null && 
+          !AuthStateService.instance.isLoadingUser.value) {
+        AuthStateService.instance.refreshUserData();
+      }
+    });
   }
 
   @override

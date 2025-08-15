@@ -52,30 +52,50 @@ class GoogleAuthService {
     }
   }
 
-  /// เปลี่ยนบัญชี Google (บังคับเลือกใหม่)
-  static Future<UserCredential?> switchGoogleAccount() async {
-    try {
-      // ออกจากระบบก่อน
-      await _googleSignIn.signOut();
-      await FirebaseAuth.instance.signOut();
-      
-      // เลือกบัญชีใหม่
-      return await signInWithGoogle();
-    } catch (e) {
-      debugPrint('❌ Switch Account Error: $e');
-      rethrow;
-    }
-  }
 
-  /// ออกจากระบบ Google
+
+  /// ออกจากระบบ Google (เวอร์ชันเร็วและเสถียร)
   static Future<void> signOut() async {
     try {
-      await FirebaseAuth.instance.signOut();
-      await _googleSignIn.signOut();
-      debugPrint('✅ Signed out successfully');
+      debugPrint('🚪 Starting logout process...');
+      
+      // ออกจาก Firebase Auth ก่อน (สำคัญที่สุด)
+      await FirebaseAuth.instance.signOut().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('⚠️ Firebase signOut timeout');
+          return null;
+        },
+      );
+      
+      debugPrint('✅ Firebase logout completed');
+      
+      // ออกจาก Google Sign-In แบบไม่บล็อก
+      _googleSignIn.signOut().catchError((error) {
+        debugPrint('⚠️ Google signOut warning (ignorable): $error');
+        return null;
+      });
+      
+      // ทำ disconnect แบบไม่รอผลลัพธ์ (fire and forget)
+      _googleSignIn.disconnect().catchError((error) {
+        debugPrint('⚠️ Disconnect warning (ignorable): $error');
+        return null;
+      });
+      
+      debugPrint('✅ Logout process completed');
+      
     } catch (e) {
       debugPrint('❌ Sign Out Error: $e');
-      rethrow;
+      
+      // Emergency logout - เฉพาะ Firebase Auth (ไม่ throw error)
+      try {
+        debugPrint('🔄 Attempting emergency Firebase logout...');
+        await FirebaseAuth.instance.signOut().timeout(const Duration(seconds: 2));
+        debugPrint('✅ Emergency logout successful');
+      } catch (emergencyError) {
+        debugPrint('❌ Emergency logout failed: $emergencyError');
+        // ไม่ throw error เพื่อไม่ให้แอปค้าง
+      }
     }
   }
 

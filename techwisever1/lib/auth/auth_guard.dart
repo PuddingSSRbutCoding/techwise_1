@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../login/welcome_page.dart';
 import '../main_screen.dart';
-import '../services/performance_monitor.dart';
-import '../services/crash_handler.dart';
 
 class AuthGuard extends StatefulWidget {
   const AuthGuard({super.key});
@@ -23,23 +21,12 @@ class _AuthGuardState extends State<AuthGuard> {
   }
 
   Future<void> _initializeAuth() async {
-    PerformanceMonitor.startTimer('AuthGuard_Initialize');
-    
     try {
-      // ตรวจสอบว่าแอปเสถียรหรือไม่
-      final isStable = await CrashHandler.isAppStable();
-      if (!isStable) {
-        debugPrint('🔄 App not stable, performing recovery...');
-        await CrashHandler.resetAppState();
-      }
-      
       // ตรวจสอบสถานะผู้ใช้ปัจจุบันทันที
       _currentUser = FirebaseAuth.instance.currentUser;
       
-      // รอ auth state เพียงเล็กน้อย
-      await Future.delayed(const Duration(milliseconds: 50));
-      
-      PerformanceMonitor.endTimer('AuthGuard_Initialize');
+      // รอเล็กน้อยเพื่อให้ Firebase Auth เสถียร
+      await Future.delayed(const Duration(milliseconds: 100));
       
       if (mounted) {
         setState(() {
@@ -47,21 +34,7 @@ class _AuthGuardState extends State<AuthGuard> {
         });
       }
     } catch (e) {
-      PerformanceMonitor.endTimer('AuthGuard_Initialize_Error');
       debugPrint('Auth initialization error: $e');
-      
-      // บันทึก error
-      if (e.toString().isNotEmpty) {
-        // แค่ log ไม่ต้อง await เพื่อไม่ให้ช้า
-        Future.microtask(() async {
-          try {
-            // บันทึก error ใน app state แทน
-            debugPrint('AuthGuard error logged: ${e.toString()}');
-          } catch (_) {
-            // Ignore secondary errors
-          }
-        });
-      }
       
       if (mounted) {
         setState(() {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
+import '../services/google_auth_service.dart';
 import 'edit_profile_page.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -59,11 +60,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 children: [
                   // รูปโปรไฟล์
                   Center(
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundImage: user?.photoURL != null
-                          ? NetworkImage(user!.photoURL!)
-                          : const AssetImage('assets/images/profile.png') as ImageProvider,
+                    child: FutureBuilder<String?>(
+                      future: user != null ? UserService.getUserPhotoURL(user!.uid) : null,
+                      builder: (context, snapshot) {
+                        final photoURL = snapshot.data;
+                        return CircleAvatar(
+                          radius: 60,
+                          backgroundImage: photoURL != null
+                              ? NetworkImage(photoURL)
+                              : const AssetImage('assets/images/profile.png') as ImageProvider,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -71,6 +78,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   // ข้อมูลผู้ใช้
                   _buildInfoCard('ชื่อ', user?.displayName ?? 'ไม่ระบุ'),
                   _buildInfoCard('อีเมล', user?.email ?? 'ไม่ระบุ'),
+                  _buildInfoCard('ประเภทการเข้าสู่ระบบ', 
+                    GoogleAuthService.isGoogleUser(user) ? 'Google Account' : 'อีเมล/รหัสผ่าน'),
                   _buildInfoCard('บทบาท (ระบบ)', userData?['role'] == 'admin' ? 'แอดมิน' : 'ผู้ใช้'),
                   _buildInfoCard('บทบาท', userData?['userRole'] ?? 'ไม่ระบุ'),
                   _buildInfoCard('ระดับชั้น', userData?['grade'] ?? 'ไม่ระบุ'),
@@ -83,6 +92,45 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       : 'ไม่ระบุ'),
 
                   const SizedBox(height: 30),
+
+                  // ข้อมูลเพิ่มเติมสำหรับผู้ใช้ Google
+                  if (GoogleAuthService.isGoogleUser(user))
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info, color: Colors.blue[700], size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'ข้อมูลสำหรับผู้ใช้ Google',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '• คุณสามารถเปลี่ยนรูปโปรไฟล์ที่แสดงในแอปได้แม้ว่าจะเข้าสู่ระบบด้วย Google\n• รูปที่คุณเลือกจะแสดงแทนรูปจาก Google Account\n• ข้อมูลอื่นๆ สามารถแก้ไขได้ตามปกติ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[700],
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // ปุ่มแก้ไขข้อมูล
                   SizedBox(

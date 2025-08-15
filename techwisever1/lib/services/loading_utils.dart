@@ -43,20 +43,18 @@ class LoadingUtils {
     });
   }
 
-  /// ปิด loading dialog อย่างปลอดภัย
+  /// ปิด loading dialog อย่างปลอดภัย (ปรับปรุงให้เร็วขึ้น)
   static void hideLoadingDialog(BuildContext context) {
     if (!_isDialogOpen) return; // ถ้าไม่มี dialog เปิดอยู่ก็ไม่ต้องทำอะไร
     
-    if (context.mounted && Navigator.canPop(context)) {
-      try {
+    try {
+      if (context.mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
-        _isDialogOpen = false;
-      } catch (e) {
-        debugPrint('Error hiding loading dialog: $e');
-        _isDialogOpen = false; // รีเซ็ตสถานะแม้เกิด error
       }
-    } else {
-      _isDialogOpen = false; // รีเซ็ตสถานะถ้า context ไม่พร้อมใช้
+    } catch (e) {
+      debugPrint('Error hiding loading dialog: $e');
+    } finally {
+      _isDialogOpen = false; // รีเซ็ตสถานะเสมอ
     }
   }
 

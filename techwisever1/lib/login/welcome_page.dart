@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../services/google_auth_service.dart';
+import '../services/user_service.dart';
 import '../services/loading_utils.dart';
 import '../services/auth_utils.dart';
 import 'login_page1.dart';
@@ -95,24 +97,64 @@ class WelcomePage extends StatelessWidget {
                       LoadingUtils.showLoadingDialog(context);
 
                       try {
-                        // ใช้ GoogleAuthService สำหรับการ sign in
-                        final userCredential = await GoogleAuthService.signInWithGoogle();
+                        // ใช้ GoogleAuthService สำหรับการ sign in พร้อม timeout
+                        final userCredential = await GoogleAuthService.signInWithGoogle().timeout(
+                          const Duration(seconds: 30),
+                          onTimeout: () => throw TimeoutException('การเข้าสู่ระบบใช้เวลานานเกินไป'),
+                        );
 
-                        // ปิด loading dialog
-                        LoadingUtils.hideLoadingDialog(context);
+                        if (userCredential != null && userCredential.user != null) {
+                          final user = userCredential.user!;
+                          
+                          try {
+                            // สร้างหรืออัปเดตข้อมูลผู้ใช้ใน Firestore ทันที
+                            await UserService.createOrUpdateUser(
+                              uid: user.uid,
+                              email: user.email ?? '',
+                              displayName: user.displayName,
+                              photoURL: user.photoURL,
+                            ).timeout(
+                              const Duration(seconds: 10),
+                              onTimeout: () => throw TimeoutException('การสร้างข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
+                            );
+                            
+                            debugPrint('✅ User data created/updated successfully');
+                          } catch (userDataError) {
+                            debugPrint('⚠️ User data creation failed (continuing anyway): $userDataError');
+                            // ไม่ throw error ที่นี่ เพราะ authentication สำเร็จแล้ว
+                          }
 
-                        // ถ้า login สำเร็จ → เคลียร์สแตกแล้วเข้า Main
-                        if (userCredential != null && context.mounted) {
-                          _goMainRoot(context); // << เปลี่ยนเฉพาะจุดนี้
+                          // ปิด loading dialog
+                          LoadingUtils.hideLoadingDialog(context);
+
+                          // นำทางทันที - AuthStateService จะจัดการโหลดข้อมูลเอง
+                          if (context.mounted) {
+                            _goMainRoot(context);
+                          }
+                        } else {
+                          // ปิด loading dialog
+                          LoadingUtils.hideLoadingDialog(context);
                         }
                       } catch (e) {
                         // ปิด loading dialog
                         LoadingUtils.hideLoadingDialog(context);
 
                         debugPrint('Google Sign-In Error: $e');
+                        
+                        // แสดง error message ที่เหมาะสม
+                        String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+                        
+                        if (e is TimeoutException || e.toString().contains('timeout')) {
+                          errorMessage = 'การเข้าสู่ระบบใช้เวลานานเกินไป กรุณาลองใหม่';
+                        } else if (e.toString().contains('network')) {
+                          errorMessage = 'ปัญหาการเชื่อมต่อเครือข่าย กรุณาตรวจสอบอินเทอร์เน็ต';
+                        } else if (e.toString().contains('ApiException: 10')) {
+                          errorMessage = 'ปัญหาการตั้งค่า Google Sign-In กรุณาติดต่อผู้ดูแลระบบ';
+                        }
+                        
                         // ใช้ AuthUtils สำหรับการแสดง error
                         if (context.mounted) {
-                          AuthUtils.showAuthError(context, e.toString());
+                          AuthUtils.showAuthError(context, errorMessage);
                         }
                       }
                     },
