@@ -21,3 +21,5 @@ echo "========================================"
 echo "Build completed!"
 echo "APK location: build/app/outputs/flutter-apk/app-release.apk"
 echo "========================================"
+
+

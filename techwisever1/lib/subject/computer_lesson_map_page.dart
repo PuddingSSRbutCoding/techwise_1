@@ -34,6 +34,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
   Set<int> _completed = {};
   int? _justUnlocked;
   int _totalStages = 3;
+  Map<int, Map<String, dynamic>> _stageScores = {};
 
   @override
   void initState() {
@@ -81,10 +82,15 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     final hide = await LocalPrefs.I.getHideLessonContentFor(_subject, widget.lesson);
 
     Set<int> comp = {...widget.completedStages};
+    Map<int, Map<String, dynamic>> scores = {};
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
         comp = await ProgressService.I.loadCompletedStages(
+          uid: user.uid, subject: _subject, lesson: widget.lesson,
+        );
+        // โหลดคะแนนทั้งหมดของบทเรียนนี้
+        scores = await ProgressService.I.getAllLessonScores(
           uid: user.uid, subject: _subject, lesson: widget.lesson,
         );
       } catch (_) {}
@@ -98,6 +104,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
       _hide = hide;
       _completed = comp;
       _totalStages = total;
+      _stageScores = scores;
       _loading = false;
     });
   }
@@ -427,6 +434,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                                     completed: done,
                                     unlocking: _justUnlocked == stage,
                                     onTap: () => _openStage(stage),
+                                    stageScore: _stageScores[stage],
                                   ),
                                 ),
                                 if (stage != _totalStages) _ThickConnector(),
@@ -483,12 +491,14 @@ class _HexStackBadge extends StatelessWidget {
   final bool completed;
   final bool unlocking;
   final VoidCallback onTap;
+  final Map<String, dynamic>? stageScore;
 
   const _HexStackBadge({
     required this.number,
     required this.completed,
     required this.unlocking,
     required this.onTap,
+    this.stageScore,
   });
 
   @override
@@ -552,15 +562,40 @@ class _HexStackBadge extends StatelessWidget {
                         blurRadius: unlocking ? 14 : 10,
                         offset: const Offset(0, 6),
                       ),
-                      child: Center(
-                        child: Text(
-                          '$number',
-                          style: TextStyle(
-                            color: numberColor,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$number',
+                            style: TextStyle(
+                              color: numberColor,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20,
+                            ),
                           ),
-                        ),
+                          // แสดงคะแนนถ้ามี
+                          if (stageScore != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '${stageScore!['score'] ?? 0}/${stageScore!['total'] ?? 0}',
+                              style: TextStyle(
+                                color: numberColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ] else if (completed) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '??/?',
+                              style: TextStyle(
+                                color: numberColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],

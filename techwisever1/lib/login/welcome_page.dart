@@ -4,7 +4,6 @@ import '../services/google_auth_service.dart';
 import '../services/user_service.dart';
 import '../services/loading_utils.dart';
 import '../services/auth_utils.dart';
-import 'login_page1.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -75,26 +74,13 @@ class WelcomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 30),
 
-                  // ✅ ปุ่ม Login ด้วย Email
-                  buildLoginButton(
-                    imagePath: 'assets/images/mail.png',
-                    text: 'เข้าสู่ระบบด้วยอีเมล',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
                   // ✅ ปุ่ม Login ด้วย Google
                   buildLoginButton(
                     imagePath: 'assets/images/google.png',
                     text: 'เข้าสู่ระบบด้วย Google',
                     onTap: () async {
                       // แสดง loading dialog
-                      LoadingUtils.showLoadingDialog(context);
+                      LoadingUtils.showSimpleLoading(context, message: 'กำลังเข้าสู่ระบบ...');
 
                       try {
                         // ใช้ GoogleAuthService สำหรับการ sign in พร้อม timeout
@@ -125,19 +111,20 @@ class WelcomePage extends StatelessWidget {
                           }
 
                           // ปิด loading dialog
-                          LoadingUtils.hideLoadingDialog(context);
+                          LoadingUtils.hideLoading(context);
 
-                          // นำทางทันที - AuthStateService จะจัดการโหลดข้อมูลเอง
+                          // นำทางทันที - AuthStateService จะจัดการโหลดข้อมูลเองในพื้นหลัง
                           if (context.mounted) {
-                            _goMainRoot(context);
+                            // ใช้ Future.microtask เพื่อให้การนำทางเกิดขึ้นทันทีหลังจากปิด loading
+                            Future.microtask(() => _goMainRoot(context));
                           }
                         } else {
                           // ปิด loading dialog
-                          LoadingUtils.hideLoadingDialog(context);
+                          LoadingUtils.hideLoading(context);
                         }
                       } catch (e) {
                         // ปิด loading dialog
-                        LoadingUtils.hideLoadingDialog(context);
+                        LoadingUtils.hideLoading(context);
 
                         debugPrint('Google Sign-In Error: $e');
                         

@@ -1,101 +1,127 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 class LoadingUtils {
-  static bool _isDialogOpen = false;
-  
-  /// แสดง loading dialog ที่มีประสิทธิภาพ
-  static void showLoadingDialog(BuildContext context) {
-    if (_isDialogOpen) return; // ป้องกัน dialog ซ้อน
-    
-    _isDialogOpen = true;
+  /// แสดง loading dialog พร้อม timeout และการจัดการ error
+  static Future<T?> showLoadingWithTimeout<T>({
+    required BuildContext context,
+    required Future<T> Function() operation,
+    Duration timeout = const Duration(seconds: 30),
+    String loadingMessage = 'กำลังดำเนินการ...',
+    String timeoutMessage = 'การดำเนินการใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง',
+    String errorMessage = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+  }) async {
+    // แสดง loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return PopScope(
-          canPop: false,
-          child: Container(
-            color: Colors.black.withOpacity(0.5),
-            child: const Center(
-              child: Card(
-                elevation: 8,
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text(
-                        'กำลังดำเนินการ...',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(loadingMessage)),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // ทำการดำเนินการพร้อม timeout
+      final result = await operation().timeout(timeout);
+      
+      // ปิด loading dialog อัตโนมัติ
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      return result;
+      
+    } on TimeoutException {
+      // ปิด loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // แสดงข้อความ timeout
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(timeoutMessage),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
           ),
         );
-      },
-    ).then((_) {
-      _isDialogOpen = false; // รีเซ็ตสถานะเมื่อปิด dialog
-    });
-  }
-
-  /// ปิด loading dialog อย่างปลอดภัย (ปรับปรุงให้เร็วขึ้น)
-  static void hideLoadingDialog(BuildContext context) {
-    if (!_isDialogOpen) return; // ถ้าไม่มี dialog เปิดอยู่ก็ไม่ต้องทำอะไร
-    
-    try {
-      if (context.mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
       }
+      return null;
+      
     } catch (e) {
-      debugPrint('Error hiding loading dialog: $e');
-    } finally {
-      _isDialogOpen = false; // รีเซ็ตสถานะเสมอ
+      // ปิด loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // แสดงข้อความ error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$errorMessage: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return null;
     }
   }
 
-  /// แสดง loading dialog พร้อมข้อความ
-  static void showLoadingDialogWithText(BuildContext context, String message) {
+  /// แสดง loading indicator แบบง่าย
+  static void showSimpleLoading(BuildContext context, {String message = 'กำลังโหลด...'}) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return PopScope(
-          canPop: false,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    message,
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
     );
+  }
+
+  /// ปิด loading dialog
+  static void hideLoading(BuildContext context) {
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// แสดงข้อความสำเร็จ
+  static void showSuccess(BuildContext context, String message) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  /// แสดงข้อความผิดพลาด
+  static void showError(BuildContext context, String message) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 } 

@@ -196,6 +196,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
         stage: widget.stage,
         score: score,
         total: total,
+        timeUsedSeconds: _secondsElapsed,
       );
     } catch (_) {}
   }
@@ -252,10 +253,14 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   }
 
   Future<void> _finishQuiz() async {
+    // หยุดตัวจับเวลา
+    _timer?.cancel();
+    
     final quiz = _quiz;
     if (quiz == null) return;
     final total = quiz.items.isEmpty ? 1 : quiz.items.length;
     final passed = _score / total >= _passRate;
+    final timeUsed = _formatTime(_secondsElapsed);
 
     await _saveScore(score: _score, total: total);
     if (!mounted) return;
@@ -265,7 +270,15 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: Text(passed ? 'ผ่านแบบฝึกหัด 🎉' : 'ยังไม่ผ่าน'),
-        content: Text('คะแนนของคุณ: $_score / $total'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('คะแนนของคุณ: $_score / $total'),
+            const SizedBox(height: 8),
+            Text('เวลาที่ใช้: $timeUsed'),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -277,6 +290,8 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
                 _selectedHistory.clear();
                 _secondsElapsed = 0;
               });
+              // เริ่มจับเวลาใหม่
+              _startTimer();
             },
             child: const Text('ทำใหม่'),
           ),

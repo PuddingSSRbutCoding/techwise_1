@@ -59,28 +59,37 @@ class GoogleAuthService {
     try {
       debugPrint('🚪 Starting logout process...');
       
-      // ออกจาก Firebase Auth ก่อน (สำคัญที่สุด)
+      // ออกจาก Firebase Auth ก่อน (สำคัญที่สุด) ด้วย timeout สั้น
       await FirebaseAuth.instance.signOut().timeout(
-        const Duration(seconds: 3),
+        const Duration(seconds: 2),
         onTimeout: () {
-          debugPrint('⚠️ Firebase signOut timeout');
+          debugPrint('⚠️ Firebase signOut timeout - continuing anyway');
           return null;
         },
       );
       
       debugPrint('✅ Firebase logout completed');
       
-      // ออกจาก Google Sign-In แบบไม่บล็อก
-      _googleSignIn.signOut().catchError((error) {
-        debugPrint('⚠️ Google signOut warning (ignorable): $error');
-        return null;
-      });
+      // ออกจาก Google Sign-In แบบ parallel (ไม่รอกัน)
+      final googleFutures = [
+        _googleSignIn.signOut().catchError((error) {
+          debugPrint('⚠️ Google signOut warning (ignorable): $error');
+          return null;
+        }),
+        _googleSignIn.disconnect().catchError((error) {
+          debugPrint('⚠️ Disconnect warning (ignorable): $error');
+          return null;
+        }),
+      ];
       
-      // ทำ disconnect แบบไม่รอผลลัพธ์ (fire and forget)
-      _googleSignIn.disconnect().catchError((error) {
-        debugPrint('⚠️ Disconnect warning (ignorable): $error');
-        return null;
-      });
+      // รอ Google operations แต่มี timeout สั้น
+      await Future.wait(googleFutures).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('⚠️ Google cleanup timeout - continuing anyway');
+          return [];
+        },
+      );
       
       debugPrint('✅ Logout process completed');
       

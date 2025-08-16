@@ -69,23 +69,68 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   void initState() {
     super.initState();
     _load();
-    _startTimer();
+    // ไม่ต้องเริ่ม timer ที่นี่ เพราะจะเริ่มใน _load() หลังจากโหลดข้อมูลเสร็จ
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null; // ตั้งค่าเป็น null เพื่อป้องกันการใช้งานหลังจาก dispose
     super.dispose();
   }
 
   void _startTimer() {
+    // หยุด timer เดิมก่อน (ถ้ามี)
+    _timer?.cancel();
+    _timer = null;
+    
+    // เริ่ม timer ใหม่
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (mounted && _timer != null) {
         setState(() {
           _secondsElapsed++;
         });
+      } else {
+        // ถ้าไม่ mounted หรือ timer ถูกยกเลิกแล้ว ให้หยุด
+        timer.cancel();
       }
     });
+    
+    // เพิ่มการรีเฟรชหน้าจอเพื่อป้องกันการโหลดค้าง
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  void _resetQuiz() {
+    // หยุด timer เดิม
+    _timer?.cancel();
+    _timer = null;
+    
+    // รีเซ็ทสถานะทั้งหมด
+    setState(() {
+      _index = 0;
+      _score = 0;
+      _selected = -1;
+      _selectedHistory.clear();
+      _secondsElapsed = 0;
+    });
+    
+    // เริ่ม timer ใหม่
+    _startTimer();
+    
+    // เพิ่มการรีเฟรชหน้าจอเพื่อป้องกันการโหลดค้าง
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
   }
 
   String _formatTime(int seconds) {
@@ -154,6 +199,10 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   ///  A) questions/{docId}/{docId}-{stage}/level_*   (ตามโครงของคุณ)
   ///  B) ถ้าไม่เจอ → fallback: ค้นใน 'questions' ด้วย lesson+stage (single doc ที่มี list)
   Future<void> _load() async {
+    // หยุด timer เดิมก่อนโหลดข้อมูลใหม่
+    _timer?.cancel();
+    _timer = null;
+    
     try {
       Map<String, dynamic>? data;
 
@@ -274,9 +323,15 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
 
       if (!mounted) return;
       setState(() => _quiz = _QuizData(title: title, items: items));
+      
+      // เริ่ม timer ใหม่หลังจากโหลดข้อมูลเสร็จ
+      _startTimer();
     } catch (e) {
       if (!mounted) return;
       setState(() => _quiz = const _QuizData(title: 'โหลดข้อมูลผิดพลาด', items: []));
+      
+      // เริ่ม timer ใหม่แม้จะโหลดข้อมูลผิดพลาด
+      _startTimer();
     }
   }
 
@@ -327,6 +382,11 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
         _index++;
         _selected = -1; // รีเซ็ตการเลือกสำหรับข้อถัดไป
       });
+      
+      // หยุดและเริ่ม timer ใหม่เพื่อป้องกันการโหลดค้าง
+      _timer?.cancel();
+      _timer = null;
+      _startTimer();
     } else {
       _finishQuiz();
     }
@@ -343,12 +403,22 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
         final item = quiz.items[_index];
         if (_selected == item.correctIndex) _score--;
       });
+      
+      // หยุดและเริ่ม timer ใหม่เพื่อป้องกันการโหลดค้าง
+      _timer?.cancel();
+      _timer = null;
+      _startTimer();
     }
   }
 
   Future<void> _finishQuiz() async {
     final quiz = _quiz;
     if (quiz == null) return;
+    
+    // หยุด timer เมื่อจบแบบทดสอบ
+    _timer?.cancel();
+    _timer = null;
+    
     final total = quiz.items.isEmpty ? 1 : quiz.items.length;
     final passed = _score / total >= _passRate;
 
@@ -365,13 +435,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // ปิด dialog
-              setState(() {
-                _index = 0;
-                _score = 0;
-                _selected = -1;
-                _selectedHistory.clear();
-                _secondsElapsed = 0;
-              });
+              _resetQuiz(); // ใช้ฟังก์ชันรีเซ็ทที่สร้างขึ้นใหม่
             },
             child: const Text('ทำใหม่'),
           ),
@@ -797,3 +861,4 @@ class _ChoiceCapsule extends StatelessWidget {
     );
   }
 }
+

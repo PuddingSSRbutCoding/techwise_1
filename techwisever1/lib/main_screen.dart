@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/subject/select_subject_page.dart';
 import 'package:techwisever1/profile/profile_page.dart';
 import 'package:techwisever1/services/app_nav.dart';
@@ -32,10 +33,13 @@ class _MainScreenState extends State<MainScreen> {
     };
     AppNav.bottomIndex.addListener(_navListener);
     
-    // เริ่มโหลดข้อมูลผู้ใช้ในพื้นหลังหากยังไม่ได้โหลด
+    // เริ่มโหลดข้อมูลผู้ใช้ในพื้นหลังหากยังไม่ได้โหลดและมีผู้ใช้ล็อกอิน
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (AuthStateService.instance.userData.value == null && 
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && 
+          AuthStateService.instance.userData.value == null && 
           !AuthStateService.instance.isLoadingUser.value) {
+        debugPrint('🔄 MainScreen requesting user data refresh');
         AuthStateService.instance.refreshUserData();
       }
     });

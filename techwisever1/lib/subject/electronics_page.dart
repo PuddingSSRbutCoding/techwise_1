@@ -3,12 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:techwisever1/main_screen.dart'; // ✅ เพิ่ม: กลับรากที่ MainScreen เสมอ
 import 'package:techwisever1/services/app_nav.dart';
+import 'package:techwisever1/services/progress_service.dart';
+import 'package:techwisever1/services/loading_utils.dart';
 import 'lesson_intro.dart';
 
-class ElectronicsPage extends StatelessWidget {
+class ElectronicsPage extends StatefulWidget {
   final VoidCallback? onBack;
   const ElectronicsPage({super.key, this.onBack});
 
+  @override
+  State<ElectronicsPage> createState() => _ElectronicsPageState();
+}
+
+class _ElectronicsPageState extends State<ElectronicsPage> {
   static const int _requiredStagesPerLesson = 5;
 
   List<_LessonMeta> get _lessons => const [
@@ -55,8 +62,8 @@ class ElectronicsPage extends StatelessWidget {
 
   // ✅ Back ปกติ (ถอย 1 ชั้น)
   void _goBack(BuildContext context) {
-    if (onBack != null) {
-      onBack!();
+    if (widget.onBack != null) {
+      widget.onBack!();
     } else {
       Navigator.pop(context);
     }
@@ -70,7 +77,7 @@ class ElectronicsPage extends StatelessWidget {
       if (m == null) continue;
       final n = int.tryParse(m.group(1)!);
       if (n == null) continue;
-      final data = (d.data() as Map<String, dynamic>?) ?? {};
+      final data = d.data() as Map<String, dynamic>;
       final raw = data['completedStages'];
       final list = raw is List ? List.of(raw) : <dynamic>[];
       final uniqueInts = <int>{};
@@ -80,6 +87,100 @@ class ElectronicsPage extends StatelessWidget {
       if (uniqueInts.length >= _requiredStagesPerLesson) done.add(n);
     }
     return done;
+  }
+
+  void _showResetDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // ไม่ให้ปิดด้วยการแตะพื้นหลัง
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'รีเซ็ตความคืบหน้า',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+        ),
+        content: const Text(
+          'คุณต้องการรีเซ็ตความคืบหน้าทั้งหมดของวิชาอิเล็กทรอนิกส์หรือไม่?\n\n'
+          '• ด่านที่ผ่านแล้วจะถูกล็อกใหม่\n'
+          '• คะแนนจะถูกลบทั้งหมด\n'
+          '• จะต้องเริ่มทำใหม่ตั้งแต่บทที่ 1 ด่านที่ 1\n\n'
+          '⚠️ การดำเนินการนี้ไม่สามารถยกเลิกได้',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('ไม่ใช่', style: TextStyle(fontSize: 16)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _performReset(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('ใช่', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performReset(BuildContext context) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      // แสดง loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Expanded(child: Text('กำลังรีเซ็ตความคืบหน้า...')),
+            ],
+          ),
+        ),
+      );
+
+      // ทำการรีเซ็ท
+      await ProgressService.I.resetSubjectProgress(
+        uid: uid,
+        subject: 'electronics',
+      );
+
+      // ปิด loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // แสดงข้อความสำเร็จ
+      if (context.mounted) {
+        LoadingUtils.showSuccess(context, 'รีเซ็ตความคืบหน้าสำเร็จ');
+        
+        // รีเฟรชหน้าเพื่อแสดงข้อมูลใหม่
+        setState(() {});
+      }
+
+    } catch (e) {
+      // ปิด loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // แสดงข้อความผิดพลาด
+      if (context.mounted) {
+        LoadingUtils.showError(context, 'การรีเซ็ทล้มเหลว: $e');
+      }
+    }
   }
 
   @override
@@ -129,7 +230,7 @@ class ElectronicsPage extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(top: 100, bottom: 20),
                 child: uid == null
-                    ? _buildList(context, const <int>{})
+                    ? _buildList(context, const <int>{}, {}, {})
                     : StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('users')
@@ -138,7 +239,27 @@ class ElectronicsPage extends StatelessWidget {
                             .snapshots(),
                         builder: (context, snap) {
                           final completed = snap.hasData ? _computeCompletedLessons(snap.data!) : <int>{};
-                          return _buildList(context, completed);
+                          return FutureBuilder<Map<int, Map<String, int>>>(
+                            future: ProgressService.I.getLessonsTotalScores(
+                              uid: uid,
+                              subject: 'electronics',
+                              maxLessons: _lessons.length,
+                            ),
+                            builder: (context, scoreSnap) {
+                              final lessonScores = scoreSnap.data ?? <int, Map<String, int>>{};
+                              return FutureBuilder<Map<int, int>>(
+                                future: ProgressService.I.getLessonsTotalQuestions(
+                                  uid: uid,
+                                  subject: 'electronics',
+                                  maxLessons: _lessons.length,
+                                ),
+                                builder: (context, questionSnap) {
+                                  final lessonQuestions = questionSnap.data ?? <int, int>{};
+                                  return _buildList(context, completed, lessonScores, lessonQuestions);
+                                },
+                              );
+                            },
+                          );
                         },
                       ),
               ),
@@ -158,37 +279,95 @@ class ElectronicsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildList(BuildContext context, Set<int> completed) {
+  Widget _buildList(BuildContext context, Set<int> completed, Map<int, Map<String, int>> lessonScores, Map<int, int> lessonQuestions) {
+    final allLessonsCompleted = completed.length >= _lessons.length;
+    
     return SingleChildScrollView(
       child: Column(
-        children: _lessons.map((meta) {
-          final l = meta.lesson;
-          final isUnlocked = l == 1 ? true : completed.contains(l - 1);
-          final lockReason = l == 1 ? null : 'ปลดล็อกเมื่อผ่านบทที่ ${l - 1}';
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: _LessonCard(
-              title: meta.title,
-              imagePath: meta.image,
-              locked: !isUnlocked,
-              lockReason: lockReason,
-              onTap: () {
-                if (!isUnlocked) return;
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LessonIntroPage(
-                      subject: 'electronics',
-                      lesson: l,
-                      title: meta.cleanTitle,
-                      intro: meta.intro,
-                      heroAsset: meta.image,
+        children: [
+          ..._lessons.map((meta) {
+            final l = meta.lesson;
+            final isUnlocked = l == 1 ? true : completed.contains(l - 1);
+            final lockReason = l == 1 ? null : 'ปลดล็อกเมื่อผ่านบทที่ ${l - 1}';
+            final scores = lessonScores[l];
+            final questions = lessonQuestions[l];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _LessonCard(
+                title: meta.title,
+                imagePath: meta.image,
+                locked: !isUnlocked,
+                lockReason: lockReason,
+                scores: scores,
+                questions: questions,
+                onTap: () {
+                  if (!isUnlocked) return;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => LessonIntroPage(
+                        subject: 'electronics',
+                        lesson: l,
+                        title: meta.cleanTitle,
+                        intro: meta.intro,
+                        heroAsset: meta.image,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          }).toList(),
+          
+          // ปุ่มรีเซ็ต - แสดงเมื่อผ่านทุกบทเรียนแล้ว
+          if (allLessonsCompleted)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Container(
+                width: double.infinity,
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B6B), Color(0xFFEE5A52)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () => _showResetDialog(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                );
-              },
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.refresh, color: Colors.white, size: 24),
+                      SizedBox(width: 8),
+                      Text(
+                        'รีเซ็ตเพื่อทำใหม่ทั้งหมด',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
@@ -209,8 +388,10 @@ class _LessonCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool locked;
   final String? lockReason;
+  final Map<String, int>? scores;
+  final int? questions;
   const _LessonCard({
-    required this.title, required this.imagePath, required this.onTap, this.locked = false, this.lockReason,
+    required this.title, required this.imagePath, required this.onTap, this.locked = false, this.lockReason, this.scores, this.questions,
   });
 
   @override
@@ -239,6 +420,26 @@ class _LessonCard extends StatelessWidget {
                   child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
                 ),
               ),
+              // แสดงคะแนนรวมที่มุมซ้ายล่าง
+              if (scores != null)
+                Positioned(
+                  left: 12, bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'ได้คะแนน ${scores!['score']}/${questions ?? scores!['total']}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 bottom: 12, right: 12,
                 child: ElevatedButton(

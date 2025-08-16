@@ -64,9 +64,12 @@ class ProfilePage extends StatelessWidget {
     }
     
     try {
-      // ออกจากระบบ พร้อม timeout 8 วินาที
+      // ล้างข้อมูล AuthStateService ก่อน
+      AuthStateService.instance.clearAllData();
+      
+      // ออกจากระบบ พร้อม timeout 6 วินาที (ลดลง)
       await GoogleAuthService.signOut().timeout(
-        const Duration(seconds: 8),
+        const Duration(seconds: 6),
         onTimeout: () {
           debugPrint('⚠️ Logout timeout - continuing anyway');
           return;

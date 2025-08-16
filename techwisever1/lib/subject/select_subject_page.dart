@@ -1,10 +1,20 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/subject/electronics_page.dart';
 import 'package:techwisever1/subject/computertech_page.dart';
+import 'package:techwisever1/services/subject_progress_service.dart';
 
-class SelectSubjectPage extends StatelessWidget {
+class SelectSubjectPage extends StatefulWidget {
   const SelectSubjectPage({super.key});
+
+  @override
+  State<SelectSubjectPage> createState() => _SelectSubjectPageState();
+}
+
+class _SelectSubjectPageState extends State<SelectSubjectPage> {
+  final GlobalKey<_SubjectCardCenteredState> _electronicsCardKey = GlobalKey<_SubjectCardCenteredState>();
+  final GlobalKey<_SubjectCardCenteredState> _computerCardKey = GlobalKey<_SubjectCardCenteredState>();
 
   @override
   Widget build(BuildContext context) {
@@ -43,25 +53,33 @@ class SelectSubjectPage extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 12),
                           children: [
                             SubjectCardCentered(
+                              key: _electronicsCardKey,
                               accent: const Color(0xFF00B894),
                               icon: Icons.bolt,
                               title: 'อิเล็กทรอนิกส์',
                               subtitle: 'พื้นฐาน · วงจร · เครื่องมือ',
-                              onTap: () {
-                                Navigator.of(context).push(
+                              subjectKey: 'electronics', // เพิ่ม subject key
+                              onTap: () async {
+                                await Navigator.of(context).push(
                                   MaterialPageRoute(builder: (_) => const ElectronicsPage()),
                                 );
+                                // รีเฟรชข้อมูลเมื่อกลับมา
+                                _electronicsCardKey.currentState?._loadProgress();
                               },
                             ),
                             SubjectCardCentered(
+                              key: _computerCardKey,
                               accent: const Color(0xFF2962FF),
                               icon: Icons.computer,
                               title: 'เทคนิคคอมพิวเตอร์',
                               subtitle: 'ฮาร์ดแวร์ · ซอฟต์แวร์ · เครือข่าย',
-                              onTap: () {
-                                Navigator.of(context).push(
+                              subjectKey: 'computer', // เพิ่ม subject key
+                              onTap: () async {
+                                await Navigator.of(context).push(
                                   MaterialPageRoute(builder: (_) => const ComputerTechPage()),
                                 );
+                                // รีเฟรชข้อมูลเมื่อกลับมา
+                                _computerCardKey.currentState?._loadProgress();
                               },
                             ),
                           ],
@@ -151,8 +169,15 @@ class SubjectCardCentered extends StatefulWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final String? subjectKey; // เพิ่มสำหรับดึงข้อมูลความคืบหน้า
   const SubjectCardCentered({
-    super.key, required this.accent, required this.icon, required this.title, required this.subtitle, required this.onTap,
+    super.key, 
+    required this.accent, 
+    required this.icon, 
+    required this.title, 
+    required this.subtitle, 
+    required this.onTap,
+    this.subjectKey,
   });
   @override
   State<SubjectCardCentered> createState() => _SubjectCardCenteredState();
@@ -160,6 +185,45 @@ class SubjectCardCentered extends StatefulWidget {
 
 class _SubjectCardCenteredState extends State<SubjectCardCentered> {
   bool _pressed = false;
+  Map<String, dynamic>? _progressData;
+  bool _isLoadingProgress = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgress();
+  }
+
+  Future<void> _loadProgress() async {
+    if (widget.subjectKey == null) {
+      setState(() => _isLoadingProgress = false);
+      return;
+    }
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() => _isLoadingProgress = false);
+      return;
+    }
+
+    try {
+      final progress = await SubjectProgressService.instance.getSubjectProgress(
+        uid: uid,
+        subject: widget.subjectKey!,
+      );
+      if (mounted) {
+        setState(() {
+          _progressData = progress;
+          _isLoadingProgress = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingProgress = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedScale(
@@ -197,17 +261,59 @@ class _SubjectCardCenteredState extends State<SubjectCardCentered> {
                       ),
                       child: Icon(widget.icon, size: 38, color: widget.accent),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(widget.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 13.5, color: Colors.black54, height: 1.25)),
+                        style: const TextStyle(fontSize: 13.5, color: Colors.black54, height: 1.2)),
+                    
+                    // แสดงความคืบหน้า
+                    if (widget.subjectKey != null) ...[
+                      const SizedBox(height: 6),
+                      _buildProgressSection(),
+                    ],
                   ],
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressSection() {
+    if (_isLoadingProgress) {
+      return const SizedBox(
+        height: 12,
+        width: 12,
+        child: CircularProgressIndicator(strokeWidth: 1.5),
+      );
+    }
+
+    if (_progressData == null) {
+      return const SizedBox.shrink();
+    }
+
+    final percentage = _progressData!['percentage'] as double;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: widget.accent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: widget.accent.withOpacity(0.3),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        '${percentage.toStringAsFixed(1)}%',
+        style: TextStyle(
+          fontSize: 10,
+          color: widget.accent,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

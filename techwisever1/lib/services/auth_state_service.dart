@@ -30,9 +30,11 @@ class AuthStateService {
   
   /// จัดการการเปลี่ยนแปลง auth state
   void _handleAuthStateChange(User? user) async {
+    // ยกเลิก timer เก่าทันทีเมื่อมี auth state change
+    _timeoutTimer?.cancel();
+    
     if (user == null) {
-      // ผู้ใช้ออกจากระบบ - รีเซ็ตสถานะทันที
-      _timeoutTimer?.cancel();
+      // ผู้ใช้ออกจากระบบ - รีเซ็ตสถานะทันทีและล้างข้อมูลทั้งหมด
       isLoadingUser.value = false;
       userData.value = null;
       error.value = null;
@@ -40,30 +42,83 @@ class AuthStateService {
       return;
     }
     
-    // ผู้ใช้เข้าสู่ระบบ - โหลดข้อมูลในพื้นหลัง (ไม่บล็อก UI)
+    // ผู้ใช้เข้าสู่ระบบ - ตรวจสอบก่อนว่าผู้ใช้ยังคงเป็นคนเดิมหรือไม่
+    final currentUid = userData.value?['uid'];
+    if (currentUid == user.uid) {
+      // ถ้าเป็นผู้ใช้เดิมและมีข้อมูลแล้ว ไม่ต้องโหลดใหม่
+      debugPrint('🔄 Same user - skipping reload: ${user.email}');
+      return;
+    }
+    
+    // ผู้ใช้ใหม่ - โหลดข้อมูลในพื้นหลัง
     debugPrint('🔄 Auth state changed - loading user data for: ${user.email}');
-    // ใช้ unawaited เพื่อไม่ให้บล็อก UI
-    _loadUserData(user.uid);
+    
+    // ใช้ Future.microtask และเพิ่มการตรวจสอบ mounted state
+    Future.microtask(() {
+      // ตรวจสอบอีกครั้งว่า user ยังคงเป็นคนเดิมหรือไม่ก่อนโหลด
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser?.uid == user.uid) {
+        _loadUserData(user.uid);
+      } else {
+        debugPrint('🔄 User changed during loading - cancelling');
+      }
+    });
   }
   
   /// โหลดข้อมูลผู้ใช้จาก Firestore (ปรับปรุงให้เร็วขึ้น)
   Future<void> _loadUserData(String uid) async {
+    // ตรวจสอบว่าผู้ใช้ยังคงเป็นคนเดิมหรือไม่ก่อนเริ่มโหลด
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser?.uid != uid) {
+      debugPrint('🔄 User changed before loading started - aborting');
+      return;
+    }
+    
+    // ยกเลิก timer เก่าก่อน (ถ้ามี)
+    _timeoutTimer?.cancel();
+    
     isLoadingUser.value = true;
     error.value = null;
     
-    // ลด timeout เป็น 8 วินาที เพื่อให้ responsive มากขึ้น
-    _timeoutTimer = Timer(const Duration(seconds: 8), () {
+    // ลด timeout เป็น 4 วินาที เพื่อให้ responsive มากขึ้น
+    _timeoutTimer = Timer(const Duration(seconds: 4), () {
       if (isLoadingUser.value) {
         debugPrint('⚠️ User data loading timeout');
         isLoadingUser.value = false;
-        error.value = 'การโหลดข้อมูลผู้ใช้ใช้เวลานานเกินไป';
+        
+        // ตรวจสอบอีกครั้งว่าผู้ใช้ยังคงเป็นคนเดิมก่อนสร้าง fallback
+        final stillCurrentUser = FirebaseAuth.instance.currentUser;
+        if (stillCurrentUser?.uid == uid) {
+          _createFallbackUserData(uid).then((fallbackData) {
+            // ตรวจสอบอีกครั้งก่อน set ข้อมูล
+            final finalCheck = FirebaseAuth.instance.currentUser;
+            if (finalCheck?.uid == uid) {
+              userData.value = fallbackData;
+              debugPrint('✅ Using fallback user data after timeout');
+            }
+          }).catchError((e) {
+            debugPrint('❌ Fallback data creation failed: $e');
+            // เช็คว่าผู้ใช้ยังคงเป็นคนเดิมก่อนแสดง error
+            final errorCheck = FirebaseAuth.instance.currentUser;
+            if (errorCheck?.uid == uid) {
+              error.value = 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้';
+            }
+          });
+        }
       }
     });
     
     try {
-      // ใช้ timeout ใน UserService call ด้วย
+      // ตรวจสอบอีกครั้งก่อนเริ่ม request
+      final checkUser = FirebaseAuth.instance.currentUser;
+      if (checkUser?.uid != uid) {
+        debugPrint('🔄 User changed during loading - aborting request');
+        return;
+      }
+      
+      // ใช้ timeout ใน UserService call ที่สั้นกว่า
       final data = await UserService.getUserData(uid).timeout(
-        const Duration(seconds: 6),
+        const Duration(seconds: 3),
         onTimeout: () {
           debugPrint('⚠️ UserService.getUserData timeout');
           return null;
@@ -71,6 +126,13 @@ class AuthStateService {
       );
       
       _timeoutTimer?.cancel();
+      
+      // ตรวจสอบอีกครั้งหลังได้ข้อมูล
+      final postRequestUser = FirebaseAuth.instance.currentUser;
+      if (postRequestUser?.uid != uid) {
+        debugPrint('🔄 User changed after request - discarding data');
+        return;
+      }
       
       if (data != null) {
         userData.value = data;
@@ -82,8 +144,11 @@ class AuthStateService {
           await _createUserData(uid);
         } catch (createError) {
           debugPrint('❌ Failed to create user data: $createError');
-          // ถ้าสร้างไม่ได้ก็ให้ใช้ข้อมูลจาก Firebase Auth แทน
-          userData.value = await _createFallbackUserData(uid);
+          // ตรวจสอบก่อนสร้าง fallback
+          final fallbackCheck = FirebaseAuth.instance.currentUser;
+          if (fallbackCheck?.uid == uid) {
+            userData.value = await _createFallbackUserData(uid);
+          }
         }
       }
       
@@ -93,6 +158,13 @@ class AuthStateService {
       _timeoutTimer?.cancel();
       debugPrint('❌ Failed to load user data: $e');
       
+      // ตรวจสอบก่อนจัดการ error
+      final errorUser = FirebaseAuth.instance.currentUser;
+      if (errorUser?.uid != uid) {
+        debugPrint('🔄 User changed during error handling - skipping');
+        return;
+      }
+      
       // ในกรณี error ให้ลองใช้ข้อมูลจาก Firebase Auth แทน
       try {
         userData.value = await _createFallbackUserData(uid);
@@ -100,9 +172,13 @@ class AuthStateService {
         error.value = null;
         debugPrint('✅ Using fallback user data');
       } catch (fallbackError) {
-        isLoadingUser.value = false;
-        error.value = 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้';
-        debugPrint('❌ Fallback user data failed: $fallbackError');
+        // ตรวจสอบอีกครั้งก่อนแสดง error
+        final finalErrorCheck = FirebaseAuth.instance.currentUser;
+        if (finalErrorCheck?.uid == uid) {
+          isLoadingUser.value = false;
+          error.value = 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้';
+          debugPrint('❌ Fallback user data failed: $fallbackError');
+        }
       }
     }
   }
@@ -153,6 +229,15 @@ class AuthStateService {
     if (user != null) {
       await _loadUserData(user.uid);
     }
+  }
+
+  /// ล้างข้อมูลทั้งหมดเมื่อ logout
+  void clearAllData() {
+    _timeoutTimer?.cancel();
+    isLoadingUser.value = false;
+    userData.value = null;
+    error.value = null;
+    debugPrint('🧹 All auth data cleared');
   }
   
   /// ตรวจสอบว่าผู้ใช้เป็น admin หรือไม่
