@@ -305,6 +305,84 @@ class ProgressService {
     }
   }
 
+  /// รีเซ็ตความคืบหน้าของด่านเดียว
+  Future<void> resetStageProgress({
+    required String uid,
+    required String subject,
+    required int lesson,
+    required int stage,
+  }) async {
+    try {
+      final docRef = _db
+          .collection('users')
+          .doc(uid)
+          .collection('progress')
+          .doc(_docId(subject, lesson));
+      
+      final doc = await FirebaseUtils.getDocumentWithTimeout(
+        documentRef: docRef,
+        timeout: const Duration(seconds: 10),
+      );
+      
+      if (!doc.exists) return;
+      
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) return;
+      
+      // ลบด่านออกจาก completedStages
+      final completedStages = List<int>.from(data['completedStages'] ?? []);
+      completedStages.remove(stage);
+      
+      // ลบคะแนนของด่าน
+      final scores = Map<String, dynamic>.from(data['scores'] ?? {});
+      scores.remove('s$stage');
+      
+      // อัปเดตเอกสาร
+      await FirebaseUtils.setDocumentWithTimeout(
+        documentRef: docRef,
+        data: {
+          'completedStages': completedStages,
+          'scores': scores,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        options: SetOptions(merge: true),
+        timeout: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      throw Exception('การรีเซ็ทด่านล้มเหลว: $e');
+    }
+  }
+
+  /// ตรวจสอบว่าด่านนั้นทำแบบทดสอบแล้วหรือยัง
+  Future<bool> isStageCompleted({
+    required String uid,
+    required String subject,
+    required int lesson,
+    required int stage,
+  }) async {
+    try {
+      final docRef = _db
+          .collection('users')
+          .doc(uid)
+          .collection('progress')
+          .doc(_docId(subject, lesson));
+      
+      final snap = await FirebaseUtils.getDocumentWithTimeout(
+        documentRef: docRef,
+        timeout: const Duration(seconds: 10),
+      );
+      
+      if (!snap.exists) return false;
+      
+      final data = snap.data() as Map<String, dynamic>?;
+      final completedStages = (data?['completedStages'] as List?)?.whereType<int>().toList() ?? [];
+      
+      return completedStages.contains(stage);
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// คำนวณจำนวนข้อทั้งหมดของทุกด่านในบทเรียน (รวมด่านที่ยังไม่ได้ทำ)
   Future<Map<int, int>> getLessonsTotalQuestions({
     required String uid,

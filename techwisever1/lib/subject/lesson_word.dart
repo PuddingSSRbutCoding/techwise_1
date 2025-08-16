@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:techwisever1/services/progress_service.dart';
 
 class LessonWordPage extends StatefulWidget {
   final String subject;   // 'computer' หรือ 'electronics'
@@ -25,6 +27,9 @@ class LessonWordPage extends StatefulWidget {
 class _LessonWordPageState extends State<LessonWordPage> {
   final _scrollCtrl = ScrollController();
   double _readProgress = 0.0;
+  bool _isStageCompleted = false;
+  Map<String, dynamic>? _stageScore;
+  bool _loadingScore = true;
 
   // ✅ แคชสตรีมไว้ครั้งเดียว แก้ปัญหากระพริบ/เลื่อนไม่ได้
   late final Stream<Map<String, dynamic>?> _contentStream;
@@ -34,6 +39,7 @@ class _LessonWordPageState extends State<LessonWordPage> {
     super.initState();
     _contentStream = _createDocStream().asBroadcastStream();
     _scrollCtrl.addListener(_updateProgress);
+    _checkStageStatus();
   }
 
   @override
@@ -41,6 +47,51 @@ class _LessonWordPageState extends State<LessonWordPage> {
     _scrollCtrl.removeListener(_updateProgress);
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  /// ตรวจสอบสถานะของด่าน
+  Future<void> _checkStageStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final completed = await ProgressService.I.isStageCompleted(
+          uid: user.uid,
+          subject: widget.subject,
+          lesson: widget.lesson,
+          stage: widget.stage,
+        );
+        
+        Map<String, dynamic>? score;
+        if (completed) {
+          score = await ProgressService.I.getStageScore(
+            uid: user.uid,
+            subject: widget.subject,
+            lesson: widget.lesson,
+            stage: widget.stage,
+          );
+        }
+        
+        if (mounted) {
+          setState(() {
+            _isStageCompleted = completed;
+            _stageScore = score;
+            _loadingScore = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _loadingScore = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _loadingScore = false;
+        });
+      }
+    }
   }
 
   // throttle: เปลี่ยนเกิน 1% ค่อย setState
@@ -52,6 +103,128 @@ class _LessonWordPageState extends State<LessonWordPage> {
     if ((p - _readProgress).abs() > 0.01) {
       setState(() => _readProgress = p);
     }
+  }
+
+  /// สร้างปุ่มสำหรับด่านที่ทำสำเร็จแล้ว
+  Widget _buildCompletedStageButton() {
+    if (_loadingScore) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        // ปุ่มกลับไปหน้าก่อน
+        Expanded(
+          flex: 1,
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(color: Colors.grey.shade400),
+            ),
+            child: const Text(
+              'กลับ',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // แสดงคะแนน
+        Expanded(
+          flex: 2,
+          child: Container(
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.green.shade300, width: 2),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'ด่านนี้ทำสำเร็จแล้ว!',
+                    style: TextStyle(
+                      color: Colors.green.shade800,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (_stageScore != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'คะแนน: ${_stageScore!['score'] ?? 0}/${_stageScore!['total'] ?? 0}',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// สร้างปุ่มทำแบบทดสอบ
+  Widget _buildQuizButton() {
+    return Row(
+      children: [
+        // ปุ่มกลับไปหน้าก่อน
+        Expanded(
+          flex: 1,
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(color: Colors.grey.shade400),
+            ),
+            child: const Text(
+              'กลับ',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // ปุ่มไปหน้าคำถาม
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 6,
+            ),
+            onPressed: () {
+              // ปุ่มไปหน้าคำถาม → ส่ง true ให้หน้าก่อนหน้าใช้ตัดสินใจ
+              Navigator.pop(context, true);
+            },
+            child: const Text(
+              'ไปหน้าคำถาม!!',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /* ============= Data layer ============= */
@@ -338,22 +511,9 @@ class _LessonWordPageState extends State<LessonWordPage> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: SizedBox(
                     height: 54,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 6,
-                      ),
-                      onPressed: () {
-                        // ปุ่มไปหน้าคำถาม → ส่ง true ให้หน้าก่อนหน้าใช้ตัดสินใจ
-                        Navigator.pop(context, true);
-                      },
-                      child: const Text(
-                        'ไปหน้าคำถาม!!',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
+                    child: _isStageCompleted
+                        ? _buildCompletedStageButton()
+                        : _buildQuizButton(),
                   ),
                 ),
               ),
@@ -421,7 +581,12 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          // ❌ ไม่มี IconButton ย้อนกลับอีกต่อไป
+          // ปุ่มกลับไปหน้าก่อน
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+            tooltip: 'กลับไปหน้าก่อน',
+          ),
           Expanded(
             child: StreamBuilder<String>(
               stream: titleStream,

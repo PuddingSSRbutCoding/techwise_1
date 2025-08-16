@@ -222,6 +222,38 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
       return;
     }
 
+    // ตรวจสอบว่าด่านนี้ทำสำเร็จแล้วหรือยัง
+    final user = FirebaseAuth.instance.currentUser;
+    bool isCompleted = false;
+    if (user != null) {
+      try {
+        isCompleted = await ProgressService.I.isStageCompleted(
+          uid: user.uid,
+          subject: _subject,
+          lesson: widget.lesson,
+          stage: stage,
+        );
+      } catch (_) {}
+    }
+
+    // ถ้าด่านนี้ทำสำเร็จแล้ว ให้แสดงเฉพาะเนื้อหา
+    if (isCompleted) {
+      if (!_hide) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LessonWordPage(
+              subject: _subject,
+              lesson: widget.lesson,
+              stage: stage,
+              wordDocId: '${_subject}_${widget.lesson}_$stage',
+            ),
+          ),
+        );
+      }
+      return; // ไม่ต้องทำแบบทดสอบซ้ำ
+    }
+
     // ถ้าไม่ซ่อน ให้เข้าหน้าบทเรียนก่อน
     if (!_hide) {
       final result = await Navigator.push(
@@ -338,6 +370,81 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
     );
   }
 
+  /// แสดงไดอะล็อกรีเซ็ตความคืบหน้า
+  void _showResetDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('รีเซ็ตความคืบหน้า'),
+        content: const Text(
+          'คุณต้องการรีเซ็ตความคืบหน้าของบทเรียนนี้หรือไม่?\n\n'
+          'การรีเซ็ตจะลบคะแนนและสถานะการผ่านด่านทั้งหมดของบทเรียนนี้',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _resetProgress();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('รีเซ็ต'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// รีเซ็ตความคืบหน้าของบทเรียน
+  Future<void> _resetProgress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      setState(() => _loading = true);
+      
+      await ProgressService.I.resetLessonProgress(
+        uid: user.uid,
+        subject: _subject,
+        lesson: widget.lesson,
+      );
+      
+      setState(() {
+        _completed.clear();
+        _justUnlocked = null;
+        _stageScores.clear();
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('รีเซ็ตความคืบหน้าเรียบร้อยแล้ว'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lesson = widget.lesson.clamp(1, kTotalLessons);
@@ -387,16 +494,22 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
                         onPressed: _goBack,
                       ),
                       Expanded(
-  child: Center(
-    child: Text(
-      'บท $lesson อิเล็กทรอนิกส์',
-      style: const TextStyle(
-        fontWeight: FontWeight.w800,
-        fontSize: 16,
-      ),
-    ),
-  ),
-),
+                        child: Center(
+                          child: Text(
+                            'บท $lesson อิเล็กทรอนิกส์',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // ปุ่มรีเซ็ต
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _showResetDialog,
+                        tooltip: 'รีเซ็ตความคืบหน้า',
+                      ),
                       Padding(
                         padding: const EdgeInsets.only(right: 12),
                         child: _loading

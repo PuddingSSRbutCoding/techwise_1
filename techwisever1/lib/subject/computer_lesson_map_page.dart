@@ -215,48 +215,18 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
   }
 
   Future<void> _openStage(int stage) async {
-  final locked = stage != 1 && !_completed.contains(stage - 1);
-  if (locked) {
-    _showInfo('ด่านนี้ยังไม่ปลดล็อก', 'กรุณาผ่านด่าน ${stage - 1} ก่อน');
-    return;
-  }
-  if (!_hide) {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => LessonWordPage(
-          subject: _subject,
-          lesson: widget.lesson,
-          stage: stage,
-          wordDocId: '${_subject}_${widget.lesson}_$stage',
-        ),
-      ),
-    );
-    
-    // ถ้าผู้ใช้กดย้อนกลับจากหน้าเนื้อหา (result เป็น null) ไม่ต้องไปทำแบบทดสอบ
-    if (result == null) {
+    final locked = stage != 1 && !_completed.contains(stage - 1);
+    if (locked) {
+      _showInfo('ด่านนี้ยังไม่ปลดล็อก', 'กรุณาผ่านด่าน ${stage - 1} ก่อน');
       return;
     }
-  }
-  final passed = await Navigator.push<bool>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => QuestionTC1Page(
-        lesson: widget.lesson,
-        stage: stage,
-        subject: _subject,
-      ),
-    ),
-  );
-  if (passed == true) {
-    setState(() {
-      _completed.add(stage);
-      _justUnlocked = stage;
-    });
+
+    // ตรวจสอบว่าด่านนี้ทำสำเร็จแล้วหรือยัง
     final user = FirebaseAuth.instance.currentUser;
+    bool isCompleted = false;
     if (user != null) {
       try {
-        await ProgressService.I.addCompletedStage(
+        isCompleted = await ProgressService.I.isStageCompleted(
           uid: user.uid,
           subject: _subject,
           lesson: widget.lesson,
@@ -264,9 +234,72 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
         );
       } catch (_) {}
     }
-    _showPassedSheet(stage);
+
+    // ถ้าด่านนี้ทำสำเร็จแล้ว ให้แสดงเฉพาะเนื้อหา
+    if (isCompleted) {
+      if (!_hide) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LessonWordPage(
+              subject: _subject,
+              lesson: widget.lesson,
+              stage: stage,
+              wordDocId: '${_subject}_${widget.lesson}_$stage',
+            ),
+          ),
+        );
+      }
+      return; // ไม่ต้องทำแบบทดสอบซ้ำ
+    }
+
+    if (!_hide) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LessonWordPage(
+            subject: _subject,
+            lesson: widget.lesson,
+            stage: stage,
+            wordDocId: '${_subject}_${widget.lesson}_$stage',
+          ),
+        ),
+      );
+      
+      // ถ้าผู้ใช้กดย้อนกลับจากหน้าเนื้อหา (result เป็น null) ไม่ต้องไปทำแบบทดสอบ
+      if (result == null) {
+        return;
+      }
+    }
+    final passed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuestionTC1Page(
+          lesson: widget.lesson,
+          stage: stage,
+          subject: _subject,
+        ),
+      ),
+    );
+    if (passed == true) {
+      setState(() {
+        _completed.add(stage);
+        _justUnlocked = stage;
+      });
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          await ProgressService.I.addCompletedStage(
+            uid: user.uid,
+            subject: _subject,
+            lesson: widget.lesson,
+            stage: stage,
+          );
+        } catch (_) {}
+      }
+      _showPassedSheet(stage);
+    }
   }
-}
 
   void _showInfo(String title, String msg) {
     showDialog(
@@ -330,6 +363,81 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     );
   }
 
+  /// แสดงไดอะล็อกรีเซ็ตความคืบหน้า
+  void _showResetDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('รีเซ็ตความคืบหน้า'),
+        content: const Text(
+          'คุณต้องการรีเซ็ตความคืบหน้าของบทเรียนนี้หรือไม่?\n\n'
+          'การรีเซ็ตจะลบคะแนนและสถานะการผ่านด่านทั้งหมดของบทเรียนนี้',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _resetProgress();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('รีเซ็ต'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// รีเซ็ตความคืบหน้าของบทเรียน
+  Future<void> _resetProgress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      setState(() => _loading = true);
+      
+      await ProgressService.I.resetLessonProgress(
+        uid: user.uid,
+        subject: _subject,
+        lesson: widget.lesson,
+      );
+      
+      setState(() {
+        _completed.clear();
+        _justUnlocked = null;
+        _stageScores.clear();
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('รีเซ็ตความคืบหน้าเรียบร้อยแล้ว'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lesson = widget.lesson.clamp(1, kTotalLessons);
@@ -379,16 +487,22 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                         onPressed: _goBack,
                       ),
                       Expanded(
-  child: Center(
-    child: Text(
-      'บท $lesson คอมพิวเตอร์',
-      style: const TextStyle(
-        fontWeight: FontWeight.w800,
-        fontSize: 16,
-      ),
-    ),
-  ),
-),
+                        child: Center(
+                          child: Text(
+                            'บท $lesson คอมพิวเตอร์',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // ปุ่มรีเซ็ต
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _showResetDialog,
+                        tooltip: 'รีเซ็ตความคืบหน้า',
+                      ),
                       Padding(
                         padding: const EdgeInsets.only(right: 12),
                         child: _loading
