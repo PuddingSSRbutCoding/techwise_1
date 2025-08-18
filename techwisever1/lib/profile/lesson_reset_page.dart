@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/progress_service.dart';
@@ -149,21 +150,31 @@ class _LessonResetPageState extends State<LessonResetPage> {
 
     if (shouldReset != true) return;
 
-    setState(() {
-      _isLoading = true;
-      _resetStatus = 'กำลังรีเซ็ตความคืบหน้า $subjectName...';
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _resetStatus = 'กำลังรีเซ็ตความคืบหน้า $subjectName...';
+      });
+    }
 
     try {
+      // เพิ่ม timeout เพื่อป้องกันการค้าง
       await ProgressService.I.resetSubjectProgress(
         uid: user.uid,
         subject: subject,
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw TimeoutException('การรีเซ็ตใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง');
+        },
       );
 
-      setState(() {
-        _resetStatus = '✅ รีเซ็ตความคืบหน้า $subjectName สำเร็จ';
-        _subjectResetStatus[subject] = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resetStatus = '✅ รีเซ็ตความคืบหน้า $subjectName สำเร็จ';
+          _subjectResetStatus[subject] = false;
+        });
+      }
 
       // รีเฟรชหน้าหลังจากรีเซ็ตสำเร็จ
       Future.delayed(const Duration(seconds: 2), () {
@@ -173,10 +184,27 @@ class _LessonResetPageState extends State<LessonResetPage> {
           });
         }
       });
-    } catch (e) {
-      setState(() {
-        _resetStatus = '❌ เกิดข้อผิดพลาด: $e';
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        setState(() {
+          _resetStatus = '⏰ ${e.message}';
+        });
+      }
+      
+      // ล้างข้อความ timeout หลังจาก 4 วินาที
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _resetStatus = null;
+          });
+        }
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _resetStatus = '❌ เกิดข้อผิดพลาด: $e';
+        });
+      }
       
       // ล้างข้อความ error หลังจาก 3 วินาที
       Future.delayed(const Duration(seconds: 3), () {
@@ -187,9 +215,12 @@ class _LessonResetPageState extends State<LessonResetPage> {
         }
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // หยุด loading หลังจากรีเซ็ตเสร็จ (ไม่ว่าจะสำเร็จหรือไม่)
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -228,29 +259,43 @@ class _LessonResetPageState extends State<LessonResetPage> {
 
     if (shouldReset != true) return;
 
-    setState(() {
-      _isLoading = true;
-      _resetStatus = 'กำลังรีเซ็ตความคืบหน้าทั้งหมด...';
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _resetStatus = 'กำลังรีเซ็ตความคืบหน้าทั้งหมด...';
+      });
+    }
 
     try {
-      // รีเซ็ตทั้งสองวิชา
+      // รีเซ็ตทั้งสองวิชาพร้อม timeout
       await Future.wait([
         ProgressService.I.resetSubjectProgress(
           uid: user.uid,
           subject: 'electronics',
+        ).timeout(
+          const Duration(seconds: 60),
+          onTimeout: () {
+            throw TimeoutException('การรีเซ็ตวิชาอิเล็กทรอนิกส์ใช้เวลานานเกินไป');
+          },
         ),
         ProgressService.I.resetSubjectProgress(
           uid: user.uid,
           subject: 'computer',
+        ).timeout(
+          const Duration(seconds: 60),
+          onTimeout: () {
+            throw TimeoutException('การรีเซ็ตวิชาคอมพิวเตอร์ใช้เวลานานเกินไป');
+          },
         ),
       ]);
 
-      setState(() {
-        _resetStatus = '✅ รีเซ็ตความคืบหน้าทั้งหมดสำเร็จ';
-        _subjectResetStatus['electronics'] = false;
-        _subjectResetStatus['computer'] = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resetStatus = '✅ รีเซ็ตความคืบหน้าทั้งหมดสำเร็จ';
+          _subjectResetStatus['electronics'] = false;
+          _subjectResetStatus['computer'] = false;
+        });
+      }
 
       // รีเฟรชหน้าหลังจากรีเซ็ตสำเร็จ
       Future.delayed(const Duration(seconds: 2), () {
@@ -260,10 +305,27 @@ class _LessonResetPageState extends State<LessonResetPage> {
           });
         }
       });
-    } catch (e) {
-      setState(() {
-        _resetStatus = '❌ เกิดข้อผิดพลาด: $e';
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        setState(() {
+          _resetStatus = '⏰ ${e.message}';
+        });
+      }
+      
+      // ล้างข้อความ timeout หลังจาก 4 วินาที
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _resetStatus = null;
+          });
+        }
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _resetStatus = '❌ เกิดข้อผิดพลาด: $e';
+        });
+      }
       
       // ล้างข้อความ error หลังจาก 3 วินาที
       Future.delayed(const Duration(seconds: 3), () {
@@ -274,9 +336,12 @@ class _LessonResetPageState extends State<LessonResetPage> {
         }
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // หยุด loading หลังจากรีเซ็ตเสร็จ (ไม่ว่าจะสำเร็จหรือไม่)
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

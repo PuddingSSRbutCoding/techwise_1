@@ -252,7 +252,7 @@ class _LessonWordPageState extends State<LessonWordPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'ด่านนี้สำเร็จแล้ว!',
+                    'สำเร็จ!',
                     style: TextStyle(
                       color: Colors.green.shade800,
                       fontWeight: FontWeight.bold,

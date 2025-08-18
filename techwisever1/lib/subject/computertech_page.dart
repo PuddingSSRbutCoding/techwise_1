@@ -322,10 +322,15 @@ class _ComputerTechPageState extends State<ComputerTechPage> with AutomaticKeepA
         ),
       );
 
-      // ทำการรีเซ็ท
+      // ทำการรีเซ็ทพร้อม timeout
       await ProgressService.I.resetSubjectProgress(
         uid: uid,
         subject: 'computer',
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw TimeoutException('การรีเซ็ตใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง');
+        },
       );
 
       // รอสักครู่เพื่อให้ Firebase อัปเดตข้อมูล
@@ -348,6 +353,16 @@ class _ComputerTechPageState extends State<ComputerTechPage> with AutomaticKeepA
         if (context.mounted) {
           setState(() {});
         }
+      }
+    } on TimeoutException catch (e) {
+      // ปิด loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // แสดงข้อความ timeout
+      if (context.mounted) {
+        LoadingUtils.showError(context, '⏰ ${e.message}');
       }
     } catch (e) {
       // ปิด loading dialog
