@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:techwisever1/services/progress_service.dart';
+import 'package:techwisever1/services/score_stream_service.dart';
 
 class LessonWordPage extends StatefulWidget {
-  final String subject;   // 'computer' หรือ 'electronics'
-  final int lesson;       // เลขบท
-  final int stage;        // เลขด่าน
+  final String subject; // 'computer' หรือ 'electronics'
+  final int lesson; // เลขบท
+  final int stage; // เลขด่าน
   final String? fallbackHeroAsset;
   final String? wordDocId; // ถ้าส่งมาก็อ่านตรงจากคอลเล็กชันตาม subject
 
@@ -60,7 +61,7 @@ class _LessonWordPageState extends State<LessonWordPage> {
           lesson: widget.lesson,
           stage: widget.stage,
         );
-        
+
         Map<String, dynamic>? score;
         if (completed) {
           score = await ProgressService.I.getStageScore(
@@ -70,7 +71,7 @@ class _LessonWordPageState extends State<LessonWordPage> {
             stage: widget.stage,
           );
         }
-        
+
         if (mounted) {
           setState(() {
             _isStageCompleted = completed;
@@ -92,6 +93,55 @@ class _LessonWordPageState extends State<LessonWordPage> {
         });
       }
     }
+  }
+
+  /// สร้าง StreamBuilder สำหรับความคืบหน้าของด่าน
+  Widget _buildStageProgressStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: ScoreStreamService.instance.getStageProgressStream(
+        uid: user.uid,
+        subject: widget.subject,
+        lesson: widget.lesson,
+        stage: widget.stage,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final stageData = snapshot.data;
+        if (stageData == null) {
+          return const SizedBox.shrink();
+        }
+
+        final isCompleted = stageData['isCompleted'] as bool? ?? false;
+        final lastUpdated = stageData['lastUpdated'] as String? ?? 'unknown';
+
+        // อัปเดต state เมื่อข้อมูลเปลี่ยน
+        if (mounted && (_isStageCompleted != isCompleted || _stageScore != stageData)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              _isStageCompleted = isCompleted;
+              _stageScore = stageData;
+              _loadingScore = false;
+            });
+          });
+        }
+
+        return const SizedBox.shrink(); // ไม่แสดง UI แต่ใช้เพื่ออัปเดต state
+      },
+    );
   }
 
   // throttle: เปลี่ยนเกิน 1% ค่อย setState
@@ -128,15 +178,35 @@ class _LessonWordPageState extends State<LessonWordPage> {
         // ปุ่มกลับไปหน้าก่อน
         Expanded(
           flex: 1,
-          child: OutlinedButton(
+          child: ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              side: BorderSide(color: Colors.grey.shade400),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.indigo,
+              elevation: 4,
+              shadowColor: Colors.black.withOpacity(0.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: Colors.indigo.withOpacity(0.5),
+                  width: 2,
+                ),
+              ),
             ),
-            child: const Text(
-              'กลับ',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_back_ios_new, size: 18),
+                SizedBox(width: 4),
+                Text(
+                  'กลับ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -190,15 +260,35 @@ class _LessonWordPageState extends State<LessonWordPage> {
         // ปุ่มกลับไปหน้าก่อน
         Expanded(
           flex: 1,
-          child: OutlinedButton(
+          child: ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              side: BorderSide(color: Colors.grey.shade400),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.indigo,
+              elevation: 4,
+              shadowColor: Colors.black.withOpacity(0.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: Colors.indigo.withOpacity(0.5),
+                  width: 2,
+                ),
+              ),
             ),
-            child: const Text(
-              'กลับ',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_back_ios_new, size: 18),
+                SizedBox(width: 4),
+                Text(
+                  'กลับ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -210,7 +300,9 @@ class _LessonWordPageState extends State<LessonWordPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.indigo,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               elevation: 6,
             ),
             onPressed: () {
@@ -229,167 +321,265 @@ class _LessonWordPageState extends State<LessonWordPage> {
 
   /* ============= Data layer ============= */
 
-  // ค่ามาตรฐานของ subject เพื่อใช้ทำ alias/query
-  String _subjectCanonical(String s) {
-    final ss = s.toLowerCase().trim();
-    if (ss.startsWith('comp')) return 'computer';
-    if (ss.startsWith('elec')) return 'electronics';
-    return ss;
-  }
-
-  // alias ของ subject (รองรับสะกดหลากหลาย)
-  List<String> _subjectAliases(String canonical) {
-    if (canonical == 'electronics') {
-      return const ['electronics', 'electronic', 'elec'];
-    }
-    if (canonical == 'computer') {
-      return const ['computer', 'computers', 'comp', 'com'];
-    }
-    return [canonical];
-  }
-
   // map subject -> คอลเล็กชันเนื้อหา
   String _collectionForSubject(String s) {
-    final c = _subjectCanonical(s);
-    if (c == 'computer') return 'lesson_com';      // คอมพิวเตอร์
-    if (c == 'electronics') return 'lesson_words'; // อิเล็กฯ
+    final ss = s.toLowerCase().trim();
+    if (ss.startsWith('comp')) return 'lesson_com'; // คอมพิวเตอร์
+    if (ss.startsWith('elec')) return 'lesson_words'; // อิเล็กฯ
     return 'lesson_words';
   }
 
-  // ลองเปิดเอกสารตามแพทเทิร์นชื่อ docId (เช่น electronic_1_2)
-  Future<Map<String, dynamic>?> _tryGetByDocIdCandidates(String colName) async {
-    final l = widget.lesson;
-    final st = widget.stage;
-    final canon = _subjectCanonical(widget.subject);
+  /* ============= Data helpers ============= */
 
-    final candidates = <String>[
-      if (canon == 'electronics') ...[
-        'electronic_${l}_${st}',
-        'electronics_${l}_${st}',
-        'elec_${l}_${st}',
-      ] else if (canon == 'computer') ...[
-        'computer_${l}_${st}',
-        'computers_${l}_${st}',
-        'comp_${l}_${st}',
-        'com_${l}_${st}',
-      ] else
-        '${canon}_${l}_${st}',
-    ];
-
-    for (final id in candidates) {
-      final doc = await FirebaseFirestore.instance.collection(colName).doc(id).get();
-      if (doc.exists) return doc.data();
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _getIfExists(
+    String col,
+    String id,
+  ) async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection(col)
+          .doc(id)
+          .get();
+      return snap.exists ? snap : null;
+    } catch (e) {
+      print('Error getting document $col/$id: $e');
+      return null;
     }
+  }
+
+  /// 1) พยายามเปิด docId ตามแพทเทิร์น electronic_{lesson}_{stage} ก่อนเสมอ
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _findByDocIdStrict(
+    String col,
+  ) async {
+    final id = 'electronic_${widget.lesson}_${widget.stage}';
+    print('Trying strict docId: $id in collection: $col');
+    return _getIfExists(col, id);
+  }
+
+  /// 2) คิวรีแบบยืดหยุ่น: ให้ความสำคัญ state ก่อน stage และรองรับ subject หลายแบบ
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _queryFlexible(
+    String col,
+  ) async {
+    try {
+      print(
+        'Searching flexibly in $col for lesson: ${widget.lesson}, stage: ${widget.stage}',
+      );
+
+      // ลองหาโดยไม่มี subject ก่อน - เพราะ Firebase อาจไม่มี subject field
+      var qs = await FirebaseFirestore.instance
+          .collection(col)
+          .where('lesson', isEqualTo: widget.lesson)
+          .where('state', isEqualTo: widget.stage)
+          .limit(1)
+          .get();
+
+      if (qs.docs.isNotEmpty) {
+        print('Found by lesson+state (no subject): ${qs.docs.first.id}');
+        return qs.docs.first;
+      }
+
+      // ลอง stage แทน state
+      qs = await FirebaseFirestore.instance
+          .collection(col)
+          .where('lesson', isEqualTo: widget.lesson)
+          .where('stage', isEqualTo: widget.stage)
+          .limit(1)
+          .get();
+
+      if (qs.docs.isNotEmpty) {
+        print('Found by lesson+stage (no subject): ${qs.docs.first.id}');
+        return qs.docs.first;
+      }
+
+      // ตอนนี้ลอง subject combinations
+      final subjects = [
+        'electronic',
+        'electronics',
+        'elec',
+        'computer',
+        'comp',
+      ];
+
+      for (final sub in subjects) {
+        print('Trying subject: $sub');
+
+        // state ก่อน
+        qs = await FirebaseFirestore.instance
+            .collection(col)
+            .where('subject', isEqualTo: sub)
+            .where('lesson', isEqualTo: widget.lesson)
+            .where('state', isEqualTo: widget.stage)
+            .limit(1)
+            .get();
+
+        if (qs.docs.isNotEmpty) {
+          print('Found by subject+lesson+state: ${qs.docs.first.id}');
+          return qs.docs.first;
+        }
+
+        // stage ถัดมา
+        qs = await FirebaseFirestore.instance
+            .collection(col)
+            .where('subject', isEqualTo: sub)
+            .where('lesson', isEqualTo: widget.lesson)
+            .where('stage', isEqualTo: widget.stage)
+            .limit(1)
+            .get();
+
+        if (qs.docs.isNotEmpty) {
+          print('Found by subject+lesson+stage: ${qs.docs.first.id}');
+          return qs.docs.first;
+        }
+      }
+
+      // ลองดูทุก document ใน collection (debug mode)
+      print('Trying to list all documents in $col for debugging...');
+      qs = await FirebaseFirestore.instance.collection(col).limit(10).get();
+
+      for (var doc in qs.docs) {
+        final data = doc.data();
+        print(
+          'Found doc ${doc.id}: lesson=${data['lesson']}, state=${data['state']}, stage=${data['stage']}, subject=${data['subject']}',
+        );
+
+        // Manual check
+        if (data['lesson'] == widget.lesson &&
+            (data['state'] == widget.stage || data['stage'] == widget.stage)) {
+          print('Manual match found: ${doc.id}');
+          return doc;
+        }
+      }
+    } catch (e) {
+      print('Error in flexible query: $e');
+    }
+
     return null;
   }
 
-  // คิวรีด้วย subject aliases และรองรับ stage/state
-  Future<Map<String, dynamic>?> _queryByAliases(String colName) async {
-    final aliases = _subjectAliases(_subjectCanonical(widget.subject));
+  /// 3) meta pointer / inline (subjects/{subject}/lessons/{L}/stages/{S})
+  Stream<Map<String, dynamic>?> _streamFromMetaIfAny() async* {
+    try {
+      final subjDocRef = FirebaseFirestore.instance
+          .collection('subjects')
+          .doc(widget.subject)
+          .collection('lessons')
+          .doc(widget.lesson.toString())
+          .collection('stages')
+          .doc(widget.stage.toString());
 
-    // ลองด้วย stage ก่อน
-    var qs = await FirebaseFirestore.instance
-        .collection(colName)
-        .where('subject', whereIn: aliases)
-        .where('lesson', isEqualTo: widget.lesson)
-        .where('stage', isEqualTo: widget.stage)
-        .limit(1)
-        .get();
-    if (qs.docs.isNotEmpty) return qs.docs.first.data();
+      await for (final metaSnap in subjDocRef.snapshots()) {
+        final meta = metaSnap.data();
+        print('Meta data: $meta');
 
-    // ถ้าไม่เจอ ลอง state แทน
-    qs = await FirebaseFirestore.instance
-        .collection(colName)
-        .where('subject', whereIn: aliases)
-        .where('lesson', isEqualTo: widget.lesson)
-        .where('state', isEqualTo: widget.stage)
-        .limit(1)
-        .get();
-    if (qs.docs.isNotEmpty) return qs.docs.first.data();
+        if (meta == null) {
+          yield null;
+          continue;
+        }
 
-    // กันเคสไม่มี subject ในเอกสาร (คิวรีเฉพาะบท/ด่าน)
-    qs = await FirebaseFirestore.instance
-        .collection(colName)
-        .where('lesson', isEqualTo: widget.lesson)
-        .where('stage', isEqualTo: widget.stage)
-        .limit(1)
-        .get();
-    if (qs.docs.isNotEmpty) return qs.docs.first.data();
+        // inline content
+        if (meta.containsKey('title') ||
+            meta.containsKey('content') ||
+            meta.containsKey('image')) {
+          print('Using inline meta content');
+          yield meta;
+          continue;
+        }
 
-    qs = await FirebaseFirestore.instance
-        .collection(colName)
-        .where('lesson', isEqualTo: widget.lesson)
-        .where('state', isEqualTo: widget.stage)
-        .limit(1)
-        .get();
-    if (qs.docs.isNotEmpty) return qs.docs.first.data();
+        // pointer -> sourceCollection/docId
+        final colName =
+            (meta['sourceCollection'] ?? meta['collection'] ?? meta['col'])
+                as String? ??
+            _collectionForSubject(widget.subject);
+        final docId = (meta['wordDocId'] ?? meta['docId']) as String?;
 
-    return null;
-  }
+        if (docId != null && docId.isNotEmpty) {
+          print('Using meta pointer to $colName/$docId');
+          yield* FirebaseFirestore.instance
+              .collection(colName)
+              .doc(docId)
+              .snapshots()
+              .map((d) => d.data());
+          return;
+        } else {
+          // fallback เก่า: subject ตรงตัว + state/stage
+          print('Meta fallback search in $colName');
 
-  // fallback รวม: คิวรีด้วย aliases -> ลอง docId แพทเทิร์น
-  Future<Map<String, dynamic>?> _fallbackLookupContent() async {
-    final colName = _collectionForSubject(widget.subject);
-    final byAliases = await _queryByAliases(colName);
-    if (byAliases != null) return byAliases;
-    return await _tryGetByDocIdCandidates(colName);
+          var qs = await FirebaseFirestore.instance
+              .collection(colName)
+              .where('subject', isEqualTo: widget.subject)
+              .where('lesson', isEqualTo: widget.lesson)
+              .where('state', isEqualTo: widget.stage)
+              .limit(1)
+              .get();
+
+          if (qs.docs.isEmpty) {
+            qs = await FirebaseFirestore.instance
+                .collection(colName)
+                .where('subject', isEqualTo: widget.subject)
+                .where('lesson', isEqualTo: widget.lesson)
+                .where('stage', isEqualTo: widget.stage)
+                .limit(1)
+                .get();
+          }
+
+          yield qs.docs.isNotEmpty ? qs.docs.first.data() : null;
+        }
+      }
+    } catch (e) {
+      print('Error in meta stream: $e');
+      yield null;
+    }
   }
 
   // stream เอกสารเนื้อหา: resolve จาก subjects/... แล้วตาม wordDocId หรือ query
   Stream<Map<String, dynamic>?> _createDocStream() async* {
-    // 0) ถ้ามี wordDocId → เปิด doc ตรงตามคอลเล็กชัน subject
-    if (widget.wordDocId != null && widget.wordDocId!.isNotEmpty) {
-      final col = FirebaseFirestore.instance.collection(_collectionForSubject(widget.subject));
-      yield* col.doc(widget.wordDocId!).snapshots().map((d) => d.data());
+    final colName = _collectionForSubject(widget.subject);
+    print(
+      'Creating doc stream for subject: ${widget.subject}, lesson: ${widget.lesson}, stage: ${widget.stage}',
+    );
+    print('Using collection: $colName');
+
+    // 0) ถ้ามี wordDocId มากับพารามิเตอร์ → ตรวจสอบก่อนว่ามีจริงไหม
+    if ((widget.wordDocId ?? '').isNotEmpty) {
+      print('Checking provided wordDocId: ${widget.wordDocId}');
+      final docExists = await _getIfExists(colName, widget.wordDocId!);
+      if (docExists != null) {
+        print('WordDocId exists, using: ${widget.wordDocId}');
+        yield* docExists.reference.snapshots().map((d) {
+          print('WordDocId data: ${d.data()}');
+          return d.data();
+        });
+        return;
+      } else {
+        print('WordDocId ${widget.wordDocId} not found, trying other methods');
+      }
+    }
+
+    // 1) docId strict: electronic_{lesson}_{stage}
+    final strict = await _findByDocIdStrict(colName);
+    if (strict != null) {
+      print('Using strict docId match: ${strict.id}');
+      yield* strict.reference.snapshots().map((d) {
+        print('Strict match data: ${d.data()}');
+        return d.data();
+      });
       return;
     }
 
-    // 1) ตรวจ meta ในเส้นทาง subject/lesson/stage (ใช้ widget.subject ตามเดิม)
-    final subjDocRef = FirebaseFirestore.instance
-        .collection('subjects')
-        .doc(widget.subject)
-        .collection('lessons')
-        .doc(widget.lesson.toString())
-        .collection('stages')
-        .doc(widget.stage.toString());
-
-    await for (final metaSnap in subjDocRef.snapshots()) {
-      final meta = metaSnap.data();
-
-      // 1.1) ไม่มี meta → fallback (คิวรีด้วย aliases และลอง docId หลายรูปแบบ)
-      if (meta == null) {
-        yield await _fallbackLookupContent();
-        continue;
-      }
-
-      // 1.2) meta มีเนื้อหาโดยตรง
-      if (meta.containsKey('title') || meta.containsKey('content') || meta.containsKey('image')) {
-        yield meta;
-        continue;
-      }
-
-      // 1.3) meta เป็นตัวชี้ → ใช้ sourceCollection/docId หรือ query
-      final colName =
-          (meta['sourceCollection'] ?? meta['collection'] ?? meta['col']) as String? ??
-              _collectionForSubject(widget.subject);
-      final docId = (meta['wordDocId'] ?? meta['docId']) as String?;
-
-      if (docId != null && docId.isNotEmpty) {
-        final stream = FirebaseFirestore.instance
-            .collection(colName)
-            .doc(docId)
-            .snapshots()
-            .map((d) => d.data());
-        await for (final d in stream) {
-          yield d;
-          break;
-        }
-      } else {
-        // ไม่มี docId ให้คิวรีด้วย aliases ก่อน แล้วค่อยลอง docId แพทเทิร์น
-        final data = await _queryByAliases(colName) ?? await _tryGetByDocIdCandidates(colName);
-        yield data;
-      }
+    // 2) flexible query: ไม่ล็อก subject + รองรับ state/stage
+    final flex = await _queryFlexible(colName);
+    if (flex != null) {
+      print('Using flexible query match: ${flex.id}');
+      yield* flex.reference.snapshots().map((d) {
+        print('Flexible match data: ${d.data()}');
+        return d.data();
+      });
+      return;
     }
+
+    // 3) meta path (inline/pointer)
+    print('Trying meta path');
+    yield* _streamFromMetaIfAny();
   }
 
   /* ============= UI ============= */
@@ -401,33 +591,38 @@ class _LessonWordPageState extends State<LessonWordPage> {
         // ✅ ให้กลับไปหน้าก่อนหน้าปกติ (แผนที่ด่าน) โดยไม่ไปทำแบบทดสอบ
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop(); // กลับหน้าก่อนหน้าปกติ
-          return false;                 // เราจัดการ pop เองแล้ว
+          return false; // เราจัดการ pop เองแล้ว
         }
         return true; // ไม่มีหน้าก่อนหน้า ปล่อยระบบจัดการ
       },
       child: Scaffold(
         body: Stack(
           children: [
-            // พื้นหลัง
+            // ✅ พื้นหลังแบบเดิม - ใช้รูปภาพ
             SizedBox.expand(
-              child: Image.asset('assets/images/backgroundselect.jpg', fit: BoxFit.cover),
+              child: Image.asset(
+                'assets/images/backgroundselect.jpg',
+                fit: BoxFit.cover,
+              ),
             ),
 
             SafeArea(
               child: Column(
                 children: [
-                  // แถบบน (ไม่มีปุ่มย้อนกลับอีกต่อไป)
+                  // ✅ แถบบนแบบใหม่ - ไม่มีปุ่มย้อนกลับ
                   _TopBar(
-                    titleStream: _contentStream.map((d) => (d?['title'] as String?) ?? 'บทเรียน'),
+                    titleStream: _contentStream.map(
+                      (d) => (d?['title'] as String?) ?? 'บทเรียน',
+                    ),
                   ),
 
-                  // แถบ progress อ่าน
+                  // ✅ แถบ progress อ่านแบบเดิม - ใช้สีฟ้า
                   SizedBox(
                     height: 4,
                     child: LinearProgressIndicator(
                       value: _readProgress,
                       backgroundColor: Colors.white.withOpacity(0.25),
-                      color: Colors.indigo,
+                      color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
                       minHeight: 4,
                     ),
                   ),
@@ -443,7 +638,8 @@ class _LessonWordPageState extends State<LessonWordPage> {
                         final data = snap.data;
                         if (data == null) {
                           return const _EmptyState(
-                            message: 'ไม่พบข้อมูลบทเรียนใน Firebase (ตรวจสอบ subjects/* หรือ collection ปลายทาง)',
+                            message:
+                                'ไม่พบข้อมูลบทเรียนใน Firebase (ตรวจสอบ subjects/* หรือ collection ปลายทาง)',
                           );
                         }
 
@@ -457,35 +653,74 @@ class _LessonWordPageState extends State<LessonWordPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              // ✅ Hero Image แบบใหม่
                               if (imageUrl != null && imageUrl.isNotEmpty)
                                 _HeroImage(url: imageUrl)
                               else if (widget.fallbackHeroAsset != null)
                                 _HeroAsset(path: widget.fallbackHeroAsset!),
 
+                              // ✅ Lesson Card แบบใหม่
                               Container(
                                 margin: const EdgeInsets.only(top: 16),
-                                padding: const EdgeInsets.all(18),
+                                padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.96),
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.12),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 8),
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
                                     ),
                                   ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'บทเรียน',
-                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                                    // ✅ Header แบบเดิม - ใช้สีฟ้า
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.indigo.withOpacity(
+                                              0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.school,
+                                            color: Colors.indigo,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text(
+                                          'บทเรียน',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 16),
+                                    // ✅ Title แบบใหม่
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    // ✅ Content แบบใหม่
                                     MarkdownBody(
-                                      data: '# $title\n\n$content',
+                                      data: content,
                                       selectable: false,
                                       styleSheet: _markdownStyle(context),
                                     ),
@@ -502,21 +737,30 @@ class _LessonWordPageState extends State<LessonWordPage> {
               ),
             ),
 
-            // CTA ลอยด้านล่าง
+            // ✅ CTA ลอยด้านล่างแบบใหม่
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: SafeArea(
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: SizedBox(
-                    height: 54,
+                    height: 60, // ✅ เพิ่มความสูง
                     child: _isStageCompleted
                         ? _buildCompletedStageButton()
                         : _buildQuizButton(),
                   ),
                 ),
               ),
+            ),
+
+            // เพิ่ม StreamBuilder เพื่อ refresh อัตโนมัติ
+            Positioned(
+              top: 0,
+              left: 0,
+              child: _buildStageProgressStream(),
             ),
           ],
         ),
@@ -528,24 +772,52 @@ class _LessonWordPageState extends State<LessonWordPage> {
     final base = Theme.of(context).textTheme;
     return MarkdownStyleSheet(
       p: base.bodyMedium!.copyWith(fontSize: 16, height: 1.6),
-      h1: base.headlineSmall!.copyWith(fontSize: 22, fontWeight: FontWeight.w800),
-      h2: base.titleLarge!.copyWith(fontSize: 20, fontWeight: FontWeight.w800),
-      h3: base.titleMedium!.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
-      strong: const TextStyle(fontWeight: FontWeight.w800),
+      h1: base.headlineSmall!.copyWith(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
+      ),
+      h2: base.titleLarge!.copyWith(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
+      ),
+      h3: base.titleMedium!.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
+      ),
+      strong: const TextStyle(
+        fontWeight: FontWeight.w800,
+        color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
+      ),
       em: const TextStyle(fontStyle: FontStyle.italic),
       listBullet: base.bodyMedium!.copyWith(fontSize: 16),
       blockquote: base.bodyMedium!.copyWith(fontSize: 16, height: 1.6),
       blockquoteDecoration: BoxDecoration(
-        color: Colors.indigo.withOpacity(0.06),
-        border: const Border(left: BorderSide(color: Colors.indigoAccent, width: 4)),
+        color: Colors.indigo.withOpacity(0.06), // ✅ เปลี่ยนกลับเป็นสีฟ้า
+        border: const Border(
+          left: BorderSide(
+            color: Colors.indigo,
+            width: 4,
+          ), // ✅ เปลี่ยนกลับเป็นสีฟ้า
+        ),
       ),
       code: TextStyle(
         fontFamily: 'monospace',
         fontSize: 14,
-        backgroundColor: Colors.grey.shade100,
+        backgroundColor: Colors.indigo.withOpacity(
+          0.1,
+        ), // ✅ เปลี่ยนกลับเป็นสีฟ้า
+        color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
       ),
       horizontalRuleDecoration: BoxDecoration(
-        border: Border(bottom: BorderSide(width: 2, color: Colors.grey.shade300)),
+        border: Border(
+          bottom: BorderSide(
+            width: 2,
+            color: Colors.indigo.shade300,
+          ), // ✅ เปลี่ยนกลับเป็นสีฟ้า
+        ),
       ),
     );
   }
@@ -556,9 +828,7 @@ class _LessonWordPageState extends State<LessonWordPage> {
 class _TopBar extends StatelessWidget {
   final Stream<String> titleStream;
 
-  const _TopBar({
-    required this.titleStream,
-  });
+  const _TopBar({required this.titleStream});
 
   @override
   Widget build(BuildContext context) {
@@ -572,21 +842,16 @@ class _TopBar extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.indigo.withOpacity(0.2), // ✅ เปลี่ยนกลับเป็นสีฟ้า
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // ปุ่มกลับไปหน้าก่อน
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-            tooltip: 'กลับไปหน้าก่อน',
-          ),
+          // ✅ ไม่มีปุ่มย้อนกลับแล้ว
           Expanded(
             child: StreamBuilder<String>(
               stream: titleStream,
@@ -594,9 +859,13 @@ class _TopBar extends StatelessWidget {
                 final title = (s.data ?? 'บทเรียน').trim();
                 return Text(
                   title.isEmpty ? 'บทเรียน' : title,
-                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  textAlign: TextAlign.center, // ✅ จัดให้อยู่กลาง
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: Colors.indigo, // ✅ เปลี่ยนกลับเป็นสีฟ้า
+                  ),
                 );
               },
             ),
@@ -614,7 +883,10 @@ class _HeroImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(aspectRatio: 16 / 9, child: Image.network(url, fit: BoxFit.cover)),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(url, fit: BoxFit.cover),
+      ),
     );
   }
 }
@@ -626,7 +898,10 @@ class _HeroAsset extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(aspectRatio: 16 / 9, child: Image.asset(path, fit: BoxFit.cover)),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.asset(path, fit: BoxFit.cover),
+      ),
     );
   }
 }

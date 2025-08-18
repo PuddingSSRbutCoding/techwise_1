@@ -19,8 +19,8 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // ตั้ง timeout 30 วินาที สำหรับการ authentication
-    _timeoutTimer = Timer(const Duration(seconds: 30), () {
+    // ลด timeout เป็น 15 วินาที เพื่อให้ responsive มากขึ้น
+    _timeoutTimer = Timer(const Duration(seconds: 15), () {
       if (mounted) {
         setState(() {
           _isTimeout = true;
@@ -47,7 +47,11 @@ class _AuthGateState extends State<AuthGate> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.orange),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.orange,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'การเชื่อมต่อใช้เวลานานเกินไป',
@@ -66,7 +70,7 @@ class _AuthGateState extends State<AuthGate> {
                         _isTimeout = false;
                       });
                       _timeoutTimer?.cancel();
-                      _timeoutTimer = Timer(const Duration(seconds: 30), () {
+                      _timeoutTimer = Timer(const Duration(seconds: 15), () {
                         if (mounted) {
                           setState(() {
                             _isTimeout = true;
@@ -82,9 +86,9 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        // ปรับ loading logic - ลดเวลาแสดง loading
+        // ปรับ loading logic - ลดเวลาแสดง loading และแสดง MainScreen ทันที
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          // แสดง loading เฉพาะเมื่อยังไม่มีข้อมูลเลย (first time)
+          // แสดง loading เฉพาะเมื่อยังไม่มีข้อมูลเลย (first time) และลดเวลา
           return Scaffold(
             body: Center(
               child: Column(
@@ -93,6 +97,11 @@ class _AuthGateState extends State<AuthGate> {
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
                   const Text('กำลังตรวจสอบสถานะการเข้าสู่ระบบ...'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'หากใช้เวลานาน กรุณาลองใหม่',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
               ),
             ),
@@ -104,15 +113,30 @@ class _AuthGateState extends State<AuthGate> {
 
         final user = snap.data;
         if (user != null) {
-          // ล็อกอินแล้ว → ไปที่ MainScreen ทันที
+          // ล็อกอินแล้ว → ไปที่ MainScreen ทันทีโดยไม่รอข้อมูล
           debugPrint('✅ Auth: User authenticated - ${user.email}');
           
-          // ไม่ต้องรอ AuthStateService โหลดเสร็จ ให้ MainScreen จัดการเอง
+          // หยุด loading state ทันทีหลังจาก login สำเร็จ
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            AuthStateService.instance.isLoadingUser.value = false;
+            // ล้างข้อมูลเก่าและรีเซ็ตสถานะ
+            AuthStateService.instance.clearAllData();
+          });
+
+          // แสดง MainScreen ทันที - ไม่ต้องรอ AuthStateService
           return const MainScreen(initialIndex: 0);
         }
-        
+
         // ยังไม่ล็อกอิน → ไปที่ WelcomePage ทันที
         debugPrint('🔄 Auth: No user authenticated - showing welcome page');
+        
+        // หยุด loading state ทันทีหลังจาก logout สำเร็จ
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          AuthStateService.instance.isLoadingUser.value = false;
+          // ล้างข้อมูลเก่าและรีเซ็ตสถานะ
+          AuthStateService.instance.clearAllData();
+        });
+        
         return const WelcomePage();
       },
     );

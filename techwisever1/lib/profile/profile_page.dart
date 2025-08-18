@@ -4,14 +4,210 @@ import 'dart:async';
 import '../services/google_auth_service.dart';
 import '../services/user_service.dart';
 import '../services/auth_state_service.dart';
+import '../services/fast_auth_service.dart';
+import '../services/profile_image_service.dart';
+
 import 'admin_page.dart';
 import 'user_profile_page.dart';
 import 'settings_page.dart';
+import 'lesson_reset_page.dart'; // Added import for LessonResetPage
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
-    Future<void> _signOut(BuildContext context) async {
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('กำลังโหลดข้อมูลผู้ใช้...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 🔷 รูปภาพปกพื้นหลังเต็มด้านบน
+          Container(
+            height: 250,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/logo.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+
+          // 🔷 เนื้อหาบนภาพ (ชื่อ รูปโปรไฟล์ เมนู)
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 140),
+
+                // รูปโปรไฟล์ (ใช้ ProfileImageService แบบ global)
+                FutureBuilder<Widget>(
+                  future: ProfileImageService.getCurrentUserProfileImageWidget(
+                    radius: 50,
+                    backgroundColor: Colors.white,
+                    iconColor: Colors.grey,
+                    iconSize: 50,
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.white,
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return const CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.person, size: 50, color: Colors.grey),
+                      );
+                    }
+
+                    return snapshot.data ??
+                        const CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.person,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                        );
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  user.displayName ?? user.email ?? 'ผู้ใช้',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.black,
+                  ),
+                ),
+                if (user.email != null) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    user.email!,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ],
+                const SizedBox(height: 30),
+
+                // 🔷 เมนูโปรไฟล์
+                buildProfileMenu(
+                  icon: Icons.person,
+                  text: 'ข้อมูลส่วนตัว',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserProfilePage(),
+                      ),
+                    );
+                  },
+                ),
+                buildProfileMenu(
+                  icon: Icons.settings,
+                  text: 'การตั้งค่า',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+
+
+
+                buildProfileMenu(
+                  icon: Icons.logout,
+                  text: 'ออกจากระบบ',
+                  onTap: () => _signOut(context),
+                ),
+
+                // แสดงปุ่มสิทธิแอดมินเฉพาะผู้ดูแลเท่านั้น
+                FutureBuilder<bool>(
+                  future: _checkAdminStatus(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return buildProfileMenu(
+                        icon: Icons.verified_user,
+                        text: 'สิทธิแอดมิน',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AdminPrivilegePage(),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink(); // ซ่อนปุ่มถ้าไม่ใช่แอดมิน
+                  },
+                ),
+
+                // แสดงปุ่มรีเซ็ตบทเรียนสำหรับแอดมิน (ซ่อนไว้เสมอ)
+                FutureBuilder<bool>(
+                  future: _checkAdminStatus(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return buildProfileMenu(
+                        icon: Icons.refresh,
+                        text: 'รีเซ็ตบทเรียน (ทดสอบ)',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LessonResetPage(),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink(); // ซ่อนปุ่มถ้าไม่ใช่แอดมิน
+                  },
+                ),
+
+                const Spacer(),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'เวอร์ชัน 0.1.1',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  Future<void> _signOut(BuildContext context) async {
     // แสดง confirmation dialog ก่อน logout
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -62,22 +258,24 @@ class ProfilePage extends StatelessWidget {
         ),
       );
     }
-    
+
     try {
       // ล้างข้อมูล AuthStateService ก่อน
       AuthStateService.instance.clearAllData();
-      
-      // ออกจากระบบ พร้อม timeout 6 วินาที (ลดลง)
-      await GoogleAuthService.signOut().timeout(
-        const Duration(seconds: 6),
-        onTimeout: () {
-          debugPrint('⚠️ Logout timeout - continuing anyway');
-          return;
-        },
-      );
-      
+
+      // ใช้ FastAuthService สำหรับ logout แบบเร็ว
+      await FastAuthService.quickSignOut();
+
+      // ออกจาก Google Sign-In แบบไม่รอ
+      GoogleAuthService.signOut().catchError((e) {
+        debugPrint('⚠️ Google signOut warning: $e');
+      });
+
       debugPrint('✅ Logout completed successfully');
-      
+
+      // หยุด loading state ทันทีหลังจาก logout สำเร็จ
+      AuthStateService.instance.isLoadingUser.value = false;
+
       // ปิด loading dialog และนำทางไป welcome page
       if (context.mounted) {
         Navigator.of(context).pop(); // ปิด loading dialog
@@ -92,16 +290,21 @@ class ProfilePage extends StatelessWidget {
       if (context.mounted) {
         Navigator.of(context).pop(); // ปิด loading dialog
       }
-      
+
       debugPrint('Logout Error: $e');
-      
+
+      // หยุด loading state เมื่อเกิด error
+      AuthStateService.instance.isLoadingUser.value = false;
+
       // หากเป็น timeout หรือ error ก็ยังให้ออกจากระบบแบบบังคับ
       if (e is TimeoutException || e.toString().contains('timeout')) {
         debugPrint('🔄 Forcing logout due to timeout...');
         try {
           // Emergency logout - เฉพาะ Firebase Auth
-          await FirebaseAuth.instance.signOut().timeout(const Duration(seconds: 3));
-          
+          await FirebaseAuth.instance.signOut().timeout(
+            const Duration(seconds: 3),
+          );
+
           if (context.mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
@@ -114,7 +317,7 @@ class ProfilePage extends StatelessWidget {
           debugPrint('❌ Emergency logout failed: $emergencyError');
         }
       }
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -136,229 +339,18 @@ class ProfilePage extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        return await UserService.isAdmin(user.uid);
+        // ใช้ FastAuthService แบบเร็ว
+        return await FastAuthService.isAdminQuick(user.uid);
       } catch (e) {
-        return false;
+        // Fallback ไปใช้ UserService
+        try {
+          return await UserService.isAdmin(user.uid);
+        } catch (e2) {
+          return false;
+        }
       }
     }
     return false;
-  }
-
-
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 🔷 รูปภาพปกพื้นหลังเต็มด้านบน
-          Container(
-            height: 250,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/logo.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // 🔷 เนื้อหาบนภาพ (ชื่อ รูปโปรไฟล์ เมนู)
-          SafeArea(
-            child: user == null 
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('กำลังโหลดข้อมูลผู้ใช้...'),
-                    ],
-                  ),
-                )
-              : ValueListenableBuilder<bool>(
-                  valueListenable: AuthStateService.instance.isLoadingUser,
-                  builder: (context, isLoading, child) {
-                    // ถ้ากำลังโหลด แต่ใช้เวลาไม่นาน ให้แสดง UI ปกติพร้อม loading indicator เล็กๆ
-                    if (isLoading) {
-                      // แสดง UI ปกติแต่มี loading overlay เบาๆ
-                      return Stack(
-                        children: [
-                          // แสดง UI หลักให้ดูไม่ว่าง
-                          _buildMainProfileUI(user, context),
-                          // Loading overlay แบบใส
-                          Container(
-                            color: Colors.white.withOpacity(0.8),
-                            child: const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 32,
-                                    height: 32,
-                                    child: CircularProgressIndicator(strokeWidth: 3),
-                                  ),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    'กำลังโหลดข้อมูล...',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                    
-                    return ValueListenableBuilder<String?>(
-                      valueListenable: AuthStateService.instance.error,
-                      builder: (context, error, child) {
-                        if (error != null) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'เกิดข้อผิดพลาด',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  error,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                ),
-                                const SizedBox(height: 24),
-                                ElevatedButton(
-                                  onPressed: () => AuthStateService.instance.refreshUserData(),
-                                  child: const Text('ลองใหม่'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        
-                        return ValueListenableBuilder<Map<String, dynamic>?>(
-                          valueListenable: AuthStateService.instance.userData,
-                          builder: (context, userData, child) {
-                            return _buildMainProfileUI(user, context);
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMainProfileUI(User user, BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 140),
-
-        // รูปโปรไฟล์แบบซ้อนทับ
-        CircleAvatar(
-          radius: 50,
-          backgroundColor: Colors.white,
-          child: FutureBuilder<String?>(
-            future: UserService.getUserPhotoURL(user.uid),
-            builder: (context, snapshot) {
-              final photoURL = snapshot.data;
-              return CircleAvatar(
-                radius: 46,
-                backgroundImage: photoURL != null
-                    ? NetworkImage(photoURL)
-                    : null,
-                child: photoURL == null
-                    ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                    : null,
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        Text(
-          user.displayName ?? user.email ?? 'ผู้ใช้',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.black,
-          ),
-        ),
-        if (user.email != null) ...[
-          const SizedBox(height: 5),
-          Text(
-            user.email!,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-        const SizedBox(height: 30),
-
-        // 🔷 เมนูโปรไฟล์
-        buildProfileMenu(
-          icon: Icons.person,
-          text: 'ข้อมูลส่วนตัว',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const UserProfilePage()),
-            );
-          }
-        ),
-        buildProfileMenu(
-          icon: Icons.settings,
-          text: 'การตั้งค่า',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SettingsPage()),
-            );
-          }
-        ),
-
-        buildProfileMenu(
-          icon: Icons.logout,
-          text: 'ออกจากระบบ',
-          onTap: () => _signOut(context),
-        ),
-        // แสดงปุ่มสิทธิแอดมินเฉพาะผู้ดูแลเท่านั้น
-        FutureBuilder<bool>(
-          future: _checkAdminStatus(),
-          builder: (context, snapshot) {
-            if (snapshot.data == true) {
-              return buildProfileMenu(
-                icon: Icons.verified_user,
-                text: 'สิทธิแอดมิน',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminPrivilegePage()),
-                  );
-                }
-              );
-            }
-            return const SizedBox.shrink(); // ซ่อนปุ่มถ้าไม่ใช่แอดมิน
-          },
-        ),
-
-        const Spacer(),
-        const Padding(
-          padding: EdgeInsets.only(bottom: 10),
-          child: Text('เวอร์ชัน 0.1.1', style: TextStyle(color: Colors.grey)),
-        )
-      ],
-    );
   }
 
   Widget buildProfileMenu({

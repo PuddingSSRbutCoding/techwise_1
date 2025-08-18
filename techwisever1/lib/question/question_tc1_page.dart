@@ -652,10 +652,18 @@ class _ChoiceCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const baseGrad = LinearGradient(
+    // สีพื้นหลังสำหรับตัวเลือกปกติ
+    const normalGrad = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFFBFE9FF), Color(0xFF7FC7F2)],
+      colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+    );
+    
+    // สีพื้นหลังสำหรับตัวเลือกที่เลือก
+    const selectedGrad = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
     );
 
     return Material(
@@ -666,11 +674,23 @@ class _ChoiceCapsule extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            gradient: baseGrad,
+            gradient: selected ? selectedGrad : normalGrad,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.85), width: 1.4),
-            boxShadow: const [
-              BoxShadow(color: Color(0x55000000), blurRadius: 14, offset: Offset(0, 6)),
+            border: Border.all(
+              color: selected 
+                ? Colors.white.withOpacity(0.9) 
+                : Colors.blue.withOpacity(0.6), 
+              width: selected ? 2.0 : 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: selected 
+                  ? Colors.blue.withOpacity(0.4) 
+                  : Colors.black.withOpacity(0.15),
+                blurRadius: selected ? 20 : 12,
+                offset: const Offset(0, 6),
+                spreadRadius: selected ? 2 : 0,
+              ),
             ],
           ),
           child: Stack(
@@ -687,27 +707,48 @@ class _ChoiceCapsule extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.white.withOpacity(0.44), Colors.white.withOpacity(0.0)],
+                      colors: [
+                        Colors.white.withOpacity(selected ? 0.6 : 0.44), 
+                        Colors.white.withOpacity(0.0)
+                      ],
                     ),
                   ),
                 ),
               ),
+              
+              // เอฟเฟกต์พิเศษสำหรับตัวเลือกที่เลือก
               if (selected)
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.30),
                       borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.3),
+                          Colors.white.withOpacity(0.1),
+                        ],
+                      ),
                     ),
                   ),
                 ),
+              
+              // ข้อความ
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF0F3F59),
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFF1565C0),
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
                   height: 1.25,
+                  shadows: selected ? [
+                    const Shadow(
+                      color: Colors.black26,
+                      offset: Offset(0, 1),
+                      blurRadius: 2,
+                    ),
+                  ] : null,
                 ),
               ),
             ],

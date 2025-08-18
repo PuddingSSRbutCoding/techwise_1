@@ -124,8 +124,18 @@ class _LessonIntroPageState extends State<LessonIntroPage> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 28,
+          ),
           onPressed: () => Navigator.pop(context),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.black.withOpacity(0.3),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(8),
+            minimumSize: const Size(44, 44),
+          ),
         ),
       ),
       body: Stack(

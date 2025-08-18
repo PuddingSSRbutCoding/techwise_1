@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import '../services/google_auth_service.dart';
+import '../services/profile_image_service.dart';
 import 'edit_profile_page.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -13,7 +13,7 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
-  final User? user = FirebaseAuth.instance.currentUser;
+  User? user;
   Map<String, dynamic>? userData;
   bool isLoading = true;
 
@@ -24,15 +24,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _loadUserData() async {
-    if (user != null) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
       try {
-        final data = await UserService.getUserData(user!.uid);
+        final data = await UserService.getUserData(currentUser.uid);
         setState(() {
+          user = currentUser;
           userData = data;
           isLoading = false;
         });
       } catch (e) {
         setState(() {
+          user = currentUser;
           isLoading = false;
         });
       }
@@ -58,18 +61,48 @@ class _UserProfilePageState extends State<UserProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // รูปโปรไฟล์
+                  // รูปโปรไฟล์ (ใช้ ProfileImageService แบบ global)
                   Center(
-                    child: FutureBuilder<String?>(
-                      future: user != null ? UserService.getUserPhotoURL(user!.uid) : null,
+                    child: FutureBuilder<Widget>(
+                      future:
+                          ProfileImageService.getCurrentUserProfileImageWidget(
+                            radius: 60,
+                            backgroundColor: Colors.grey.shade300,
+                            iconColor: Colors.grey,
+                            iconSize: 60,
+                          ),
                       builder: (context, snapshot) {
-                        final photoURL = snapshot.data;
-                        return CircleAvatar(
-                          radius: 60,
-                          backgroundImage: photoURL != null
-                              ? NetworkImage(photoURL)
-                              : const AssetImage('assets/images/profile.png') as ImageProvider,
-                        );
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.grey,
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return const CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.grey,
+                            child: Icon(
+                              Icons.person,
+                              size: 60,
+                              color: Colors.white,
+                            ),
+                          );
+                        }
+
+                        return snapshot.data ??
+                            const CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.grey,
+                              child: Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.white,
+                              ),
+                            );
                       },
                     ),
                   ),
@@ -78,18 +111,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   // ข้อมูลผู้ใช้
                   _buildInfoCard('ชื่อ', user?.displayName ?? 'ไม่ระบุ'),
                   _buildInfoCard('อีเมล', user?.email ?? 'ไม่ระบุ'),
-                  _buildInfoCard('ประเภทการเข้าสู่ระบบ', 
-                    GoogleAuthService.isGoogleUser(user) ? 'Google Account' : 'อีเมล/รหัสผ่าน'),
-                  _buildInfoCard('บทบาท (ระบบ)', userData?['role'] == 'admin' ? 'แอดมิน' : 'ผู้ใช้'),
+                  _buildInfoCard(
+                    'ประเภทการเข้าสู่ระบบ',
+                    GoogleAuthService.isGoogleUser(user)
+                        ? 'Google Account'
+                        : 'อีเมล/รหัสผ่าน',
+                  ),
                   _buildInfoCard('บทบาท', userData?['userRole'] ?? 'ไม่ระบุ'),
                   _buildInfoCard('ระดับชั้น', userData?['grade'] ?? 'ไม่ระบุ'),
-                  _buildInfoCard('สถานที่ศึกษา', userData?['institution'] ?? 'ไม่ระบุ'),
-                  _buildInfoCard('วันที่สร้าง', userData?['createdAt'] != null 
-                      ? _formatDate(userData!['createdAt'])
-                      : 'ไม่ระบุ'),
-                  _buildInfoCard('อัปเดตล่าสุด', userData?['updatedAt'] != null 
-                      ? _formatDate(userData!['updatedAt'])
-                      : 'ไม่ระบุ'),
+                  _buildInfoCard(
+                    'สถานที่ศึกษา',
+                    userData?['institution'] ?? 'ไม่ระบุ',
+                  ),
 
                   const SizedBox(height: 30),
 
@@ -108,7 +141,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info, color: Colors.blue[700], size: 20),
+                              Icon(
+                                Icons.info,
+                                color: Colors.blue[700],
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'ข้อมูลสำหรับผู้ใช้ Google',
@@ -168,7 +205,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 80,
@@ -180,23 +216,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 ),
               ),
             ),
-            Expanded(
-              child: Text(
-                value,
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
+            Expanded(child: Text(value, style: const TextStyle(fontSize: 16))),
           ],
         ),
       ),
     );
   }
-
-  String _formatDate(dynamic timestamp) {
-    if (timestamp is Timestamp) {
-      final date = timestamp.toDate();
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute}';
-    }
-    return 'ไม่ระบุ';
-  }
-} 
+}

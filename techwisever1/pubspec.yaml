@@ -1,8 +1,8 @@
 name: techwisever1
-description: "A new Flutter project."
+description: "TechWise - แอปพลิเคชันการเรียนรู้เทคโนโลยี"
 publish_to: 'none'
 
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.8.1
@@ -41,6 +41,8 @@ dependencies:
 
   # ✅ สำหรับการเลือกรูปภาพ
   image_picker: ^1.0.4
+  
+  flutter_launcher_icons: ^0.14.4
 
 
 dev_dependencies:
@@ -49,7 +51,6 @@ dev_dependencies:
 
   flutter_lints: ^5.0.0
 
-  flutter_launcher_icons: ^0.13.1
 
 flutter:
 

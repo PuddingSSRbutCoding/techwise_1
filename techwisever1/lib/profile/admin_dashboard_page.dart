@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import 'admin_lesson_management_page.dart';
+import 'lesson_reset_page.dart'; // เพิ่ม import สำหรับ LessonResetPage
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -198,6 +199,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 // TODO: Implement analytics
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildManagementOption(
+              'รีเซ็ตบทเรียน',
+              'รีเซ็ตคะแนนและการทำข้อสอบของผู้ใช้ทั่วไป',
+              Icons.refresh,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LessonResetPage()),
                 );
               },
             ),

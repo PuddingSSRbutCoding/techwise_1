@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:techwisever1/services/auth_state_service.dart';
 
 /// Google Authentication Service - เวอร์ชันเรียบง่าย
 class GoogleAuthService {
@@ -38,9 +39,16 @@ class GoogleAuthService {
       final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       
       debugPrint('🎉 Google Sign-In successful: ${userCredential.user?.email}');
+      
+      // หยุด loading state ทันทีหลังจาก login สำเร็จ
+      AuthStateService.instance.isLoadingUser.value = false;
+      
       return userCredential;
     } catch (e) {
       debugPrint('❌ Google Sign-In Error: $e');
+      
+      // หยุด loading state เมื่อเกิด error
+      AuthStateService.instance.isLoadingUser.value = false;
       
       // แสดงข้อความง่ายๆ สำหรับ API Error 10
       if (e.toString().contains('ApiException: 10')) {
@@ -70,6 +78,9 @@ class GoogleAuthService {
       
       debugPrint('✅ Firebase logout completed');
       
+      // หยุด loading state ทันทีหลังจาก logout สำเร็จ
+      AuthStateService.instance.isLoadingUser.value = false;
+      
       // ออกจาก Google Sign-In แบบ parallel (ไม่รอกัน)
       final googleFutures = [
         _googleSignIn.signOut().catchError((error) {
@@ -95,6 +106,9 @@ class GoogleAuthService {
       
     } catch (e) {
       debugPrint('❌ Sign Out Error: $e');
+      
+      // หยุด loading state เมื่อเกิด error
+      AuthStateService.instance.isLoadingUser.value = false;
       
       // Emergency logout - เฉพาะ Firebase Auth (ไม่ throw error)
       try {

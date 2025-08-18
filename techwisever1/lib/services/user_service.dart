@@ -7,7 +7,7 @@ import 'dart:async';
 class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
-  
+
   /// ตรวจสอบว่า Firebase Storage พร้อมใช้งานหรือไม่
   static Future<bool> _isStorageAvailable() async {
     try {
@@ -46,23 +46,39 @@ class UserService {
       if (grade != null) userData['grade'] = grade;
       if (institution != null) userData['institution'] = institution;
 
-      await _firestore.collection('users').doc(uid).set(userData, SetOptions(merge: true)).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('การสร้างข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
-      );
+      // ลด timeout เป็น 5 วินาที เพื่อให้เร็วขึ้น
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .set(userData, SetOptions(merge: true))
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () =>
+                throw TimeoutException('การสร้างข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
+          );
 
       // ถ้าเป็นครั้งแรกที่สร้าง ให้เพิ่ม createdAt
-      final doc = await _firestore.collection('users').doc(uid).get().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw TimeoutException('การตรวจสอบข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
-      );
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get()
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => throw TimeoutException(
+              'การตรวจสอบข้อมูลผู้ใช้ใช้เวลานานเกินไป',
+            ),
+          );
       if (!doc.exists || doc.data()?['createdAt'] == null) {
-        await _firestore.collection('users').doc(uid).update({
-          'createdAt': FieldValue.serverTimestamp(),
-        }).timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => throw TimeoutException('การอัปเดตข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
-        );
+        await _firestore
+            .collection('users')
+            .doc(uid)
+            .update({'createdAt': FieldValue.serverTimestamp()})
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () => throw TimeoutException(
+                'การอัปเดตข้อมูลผู้ใช้ใช้เวลานานเกินไป',
+              ),
+            );
       }
     } catch (e) {
       throw Exception('Failed to create/update user: $e');
@@ -72,10 +88,16 @@ class UserService {
   /// รับข้อมูลผู้ใช้จาก Firestore
   static Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
-      final doc = await _firestore.collection('users').doc(uid).get().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('การดึงข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
-      );
+      // ลด timeout เป็น 5 วินาที เพื่อให้เร็วขึ้น
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get()
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () =>
+                throw TimeoutException('การดึงข้อมูลผู้ใช้ใช้เวลานานเกินไป'),
+          );
       if (doc.exists) {
         return doc.data();
       }
@@ -106,7 +128,7 @@ class UserService {
     try {
       final userData = await getUserData(uid);
       final email = userData?['email'] ?? '';
-      
+
       // ตรวจสอบบัญชีพิเศษที่กำหนดเป็น admin โดยตรง
       if (email == 'techwiseofficialth@gmail.com') {
         // อัปเดต role เป็น admin ถ้ายังไม่ได้ตั้งค่า
@@ -115,7 +137,7 @@ class UserService {
         }
         return true;
       }
-      
+
       return userData?['role'] == 'admin';
     } catch (e) {
       return false;
@@ -123,7 +145,10 @@ class UserService {
   }
 
   /// อัปเดตข้อมูลผู้ใช้
-  static Future<void> updateUserData(String uid, Map<String, dynamic> data) async {
+  static Future<void> updateUserData(
+    String uid,
+    Map<String, dynamic> data,
+  ) async {
     try {
       await _firestore.collection('users').doc(uid).update({
         ...data,
@@ -176,12 +201,17 @@ class UserService {
       // ตรวจสอบว่า Storage พร้อมใช้งาน
       final isAvailable = await _isStorageAvailable();
       if (!isAvailable) {
-        throw Exception('Firebase Storage is not available. Please check your Firebase configuration.');
+        throw Exception(
+          'Firebase Storage is not available. Please check your Firebase configuration.',
+        );
       }
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final ref = _storage.ref().child('profile_images').child('${uid}_$timestamp.jpg');
-      
+      final ref = _storage
+          .ref()
+          .child('profile_images')
+          .child('${uid}_$timestamp.jpg');
+
       // เพิ่ม metadata สำหรับไฟล์
       final metadata = SettableMetadata(
         contentType: 'image/jpeg',
@@ -190,22 +220,29 @@ class UserService {
           'upload_time': DateTime.now().toIso8601String(),
         },
       );
-      
+
       // ใช้ timeout เพื่อป้องกันการรอนาน
-      final uploadTask = await ref.putFile(imageFile, metadata).timeout(
-        const Duration(minutes: 5),
-        onTimeout: () => throw TimeoutException('Upload timeout after 5 minutes'),
-      );
-      
+      final uploadTask = await ref
+          .putFile(imageFile, metadata)
+          .timeout(
+            const Duration(minutes: 5),
+            onTimeout: () =>
+                throw TimeoutException('Upload timeout after 5 minutes'),
+          );
+
       final downloadURL = await uploadTask.ref.getDownloadURL();
       print('Successfully uploaded profile image: $downloadURL');
       return downloadURL;
     } on FirebaseException catch (e) {
       print('Firebase Storage error: ${e.code} - ${e.message}');
       if (e.code == 'object-not-found') {
-        throw Exception('Storage bucket not configured properly. Please check Firebase console.');
+        throw Exception(
+          'Storage bucket not configured properly. Please check Firebase console.',
+        );
       } else if (e.code == 'unauthorized') {
-        throw Exception('Unauthorized access to Storage. Please check security rules.');
+        throw Exception(
+          'Unauthorized access to Storage. Please check security rules.',
+        );
       } else {
         throw Exception('Storage error: ${e.message}');
       }
@@ -223,13 +260,14 @@ class UserService {
     try {
       // อัปโหลดรูปไปยัง Storage
       final photoURL = await uploadProfileImage(uid, imageFile);
-      
+
       // อัปเดต photoURL ใน Firestore
       await _firestore.collection('users').doc(uid).update({
-        'customPhotoURL': photoURL, // ใช้ field แยกต่างหากจาก photoURL ของ Google
+        'customPhotoURL':
+            photoURL, // ใช้ field แยกต่างหากจาก photoURL ของ Google
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       // อัปเดต photoURL ใน Firebase Auth (ถ้าต้องการ)
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && user.uid == uid) {
@@ -239,4 +277,4 @@ class UserService {
       throw Exception('Failed to update profile image: $e');
     }
   }
-} 
+}

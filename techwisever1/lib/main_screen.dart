@@ -13,18 +13,16 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   late int _selectedIndex;
   late final VoidCallback _navListener;
 
-  final List<Widget> _screens = const [
-    SelectSubjectPage(),
-    ProfilePage(),
-  ];
+  final List<Widget> _screens = const [SelectSubjectPage(), ProfilePage()];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedIndex = widget.initialIndex.clamp(0, _screens.length - 1);
     _navListener = () {
       if (!mounted) return;
@@ -32,35 +30,106 @@ class _MainScreenState extends State<MainScreen> {
       if (_selectedIndex != v) setState(() => _selectedIndex = v);
     };
     AppNav.bottomIndex.addListener(_navListener);
-    
-    // เริ่มโหลดข้อมูลผู้ใช้ในพื้นหลังหากยังไม่ได้โหลดและมีผู้ใช้ล็อกอิน
+
+    // หยุด loading state ทันทีหลังจากเข้าหน้า main สำเร็จ
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null && 
-          AuthStateService.instance.userData.value == null && 
-          !AuthStateService.instance.isLoadingUser.value) {
-        debugPrint('🔄 MainScreen requesting user data refresh');
-        AuthStateService.instance.refreshUserData();
-      }
+      // หยุด loading state ทันที
+      AuthStateService.instance.isLoadingUser.value = false;
+      
+      // โหลดข้อมูลผู้ใช้ในพื้นหลังแบบไม่บล็อก UI (ถ้าจำเป็น)
+      _loadUserDataInBackground();
     });
   }
-
+  
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AppNav.bottomIndex.removeListener(_navListener);
     super.dispose();
   }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // แอปกลับมาทำงาน - refresh ข้อมูล
+        _refreshCurrentPage();
+        break;
+      case AppLifecycleState.paused:
+        // แอปถูก pause - หยุดการ refresh
+        break;
+      case AppLifecycleState.inactive:
+        // แอปไม่ active - หยุดการ refresh
+        break;
+      case AppLifecycleState.detached:
+        // แอปถูกปิด - หยุดการ refresh
+        break;
+      default:
+        break;
+    }
+  }
+  
+  /// Refresh หน้าปัจจุบัน
+  void _refreshCurrentPage() {
+    if (mounted) {
+      setState(() {
+        // Trigger rebuild เพื่อ refresh ข้อมูล
+      });
+    }
+  }
+
+  /// โหลดข้อมูลผู้ใช้ในพื้นหลังแบบไม่บล็อก UI
+  void _loadUserDataInBackground() {
+    // ตรวจสอบว่าผู้ใช้ยังคงล็อกอินอยู่หรือไม่
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // โหลดข้อมูลในพื้นหลังแบบไม่บล็อก UI
+      Future.microtask(() async {
+        try {
+          // ใช้ timeout สั้นมากเพื่อไม่ให้บล็อก UI
+          await AuthStateService.instance.refreshUserData().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              debugPrint('⚠️ Background user data loading timeout - continuing anyway');
+              return;
+            },
+          );
+        } catch (e) {
+          debugPrint('⚠️ Background user data loading failed: $e');
+          // ไม่ throw error เพื่อไม่ให้บล็อก UI
+        }
+      });
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+          AppNav.bottomIndex.value = index;
+        },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'หน้าหลัก'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'โปรไฟล์'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.school),
+            label: 'บทเรียน',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'โปรไฟล์',
+          ),
         ],
       ),
     );

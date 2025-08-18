@@ -52,10 +52,17 @@ class _SettingsPageState extends State<SettingsPage> {
         elevation: 2,
         leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back, 
-            color: Colors.black
+            Icons.arrow_back_ios_new, 
+            color: Colors.white,
+            size: 24,
           ),
           onPressed: () => Navigator.pop(context),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(8),
+            minimumSize: const Size(44, 44),
+          ),
         ),
         title: const Text(
           'การตั้งค่า',

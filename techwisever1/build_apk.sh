@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================"
-echo "Building TechWise APK v1.0.1+2"
+echo "Building TechWise APK v1.0.2+3"
 echo "========================================"
 
 echo ""

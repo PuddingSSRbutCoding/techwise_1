@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/user_service.dart';
 import 'admin_dashboard_page.dart';
 import 'admin_user_management_page.dart';
+import 'lesson_reset_page.dart';
 
 class AdminPrivilegePage extends StatelessWidget {
   const AdminPrivilegePage({super.key});
@@ -15,8 +16,18 @@ class AdminPrivilegePage extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 2,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 24,
+          ),
           onPressed: () => Navigator.pop(context),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(8),
+            minimumSize: const Size(44, 44),
+          ),
         ),
         title: const Text(
           'สิทธิแอดมิน',
@@ -116,6 +127,35 @@ class AdminPrivilegePage extends StatelessWidget {
               }
             },
           ),
+
+          const SizedBox(height: 16),
+
+          // 🔵 ปุ่ม: รีเซ็ตบทเรียน (สำหรับแอดมิน)
+          AdminOptionButton(
+            icon: Icons.refresh,
+            label: 'รีเซ็ตบทเรียน (ทดสอบ)',
+            onTap: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final isAdmin = await UserService.isAdmin(user.uid);
+                if (isAdmin) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LessonResetPage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คุณไม่มีสิทธิ์เข้าถึงฟีเจอร์นี้'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+
+
         ],
       ),
     );

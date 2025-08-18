@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_service.dart';
 import '../services/google_auth_service.dart';
+import '../services/profile_image_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -17,26 +19,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _institutionController = TextEditingController();
-  
+
   String _selectedUserRole = 'นักศึกษา';
   String _selectedGrade = 'ม.1';
   File? _selectedImage;
   String? _currentPhotoURL; // เก็บ photo URL ปัจจุบัน
   bool _isLoading = true;
   bool _isSaving = false;
+  final ImagePicker _picker = ImagePicker(); // เพิ่ม ImagePicker
 
   final List<String> _userRoles = ['ครู-อาจารย์', 'นักศึกษา', 'อื่นๆ'];
   final List<String> _grades = [
-    'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6',
-    'ปวช.1', 'ปวช.2', 'ปวช.3',
-    'ปวส.1', 'ปวส.2',
-    'อื่นๆ'
+    'ม.1',
+    'ม.2',
+    'ม.3',
+    'ม.4',
+    'ม.5',
+    'ม.6',
+    'ปวช.1',
+    'ปวช.2',
+    'ปวช.3',
+    'ปวส.1',
+    'ปวส.2',
+    'อื่นๆ',
   ];
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadLocalProfileImage(); // เพิ่มการโหลด local profile image
   }
 
   @override
@@ -47,6 +59,84 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
+  /// โหลดรูปโปรไฟล์จาก local storage
+  Future<void> _loadLocalProfileImage() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final hasLocal = await ProfileImageService.hasLocalProfileImage(
+          user.uid,
+        );
+        if (hasLocal) {
+          final image = await ProfileImageService.getProfileImage(user.uid);
+          if (image is FileImage) {
+            setState(() {
+              _selectedImage = File(image.file.path);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading local profile image: $e');
+    }
+  }
+
+  /// บันทึกรูปโปรไฟล์ลง local storage
+  Future<void> _saveLocalProfileImage(String imagePath) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final success = await ProfileImageService.saveLocalProfileImage(
+          user.uid,
+          imagePath,
+        );
+        if (success) {
+          setState(() {
+            _selectedImage = File(imagePath);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error saving local profile image: $e');
+    }
+  }
+
+  /// ลบรูปโปรไฟล์ local และกลับไปใช้รูปเดิม
+  Future<void> _removeLocalProfileImage() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final success = await ProfileImageService.removeLocalProfileImage(
+          user.uid,
+        );
+        if (success) {
+          setState(() {
+            _selectedImage = null;
+          });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ลบรูปโปรไฟล์แล้ว กลับไปใช้รูปเดิม'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error removing local profile image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -55,7 +145,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final photoURL = await UserService.getUserPhotoURL(user.uid);
         if (mounted) {
           setState(() {
-            _nameController.text = userData?['displayName'] ?? user.displayName ?? '';
+            _nameController.text =
+                userData?['displayName'] ?? user.displayName ?? '';
             _emailController.text = user.email ?? '';
             _selectedUserRole = userData?['userRole'] ?? 'นักศึกษา';
             _selectedGrade = userData?['grade'] ?? 'ม.1';
@@ -80,31 +171,133 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  Future<void> _pickImage() async {
+  /// เลือกรูปจาก gallery
+  Future<void> _pickImageFromGallery() async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
+      final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 512,
         maxHeight: 512,
-        imageQuality: 80,
+        imageQuality: 85,
       );
-      
+
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        await _processAndSaveImage(image.path);
       }
     } catch (e) {
+      debugPrint('Error picking image from gallery: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาดในการเลือกรูปภาพ: $e'),
+            content: Text('เกิดข้อผิดพลาดในการเลือกรูป: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
+  }
+
+  /// ถ่ายรูปด้วยกล้อง
+  Future<void> _takePhotoWithCamera() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _processAndSaveImage(image.path);
+      }
+    } catch (e) {
+      debugPrint('Error taking photo with camera: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการถ่ายรูป: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// ประมวลผลและบันทึกรูปภาพ (ใช้วิธีง่ายๆ)
+  Future<void> _processAndSaveImage(String imagePath) async {
+    try {
+      // ใช้ path เดิมเลย ไม่ต้องคัดลอก
+      await _saveLocalProfileImage(imagePath);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เปลี่ยนรูปโปรไฟล์สำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error processing and saving image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการบันทึกรูป: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// แสดง dialog เลือกวิธีเปลี่ยนรูปโปรไฟล์
+  Future<void> _showChangeProfileImageDialog() async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('เปลี่ยนรูปโปรไฟล์'),
+          content: const Text('เลือกวิธีเปลี่ยนรูปโปรไฟล์'),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _takePhotoWithCamera();
+              },
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('ถ่ายรูป'),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImageFromGallery();
+              },
+              icon: const Icon(Icons.photo_library),
+              label: const Text('เลือกรูป'),
+            ),
+            if (_selectedImage != null)
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _removeLocalProfileImage();
+                },
+                icon: const Icon(Icons.delete),
+                label: const Text('ลบรูป'),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ยกเลิก'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // เก็บ method เดิมไว้สำหรับ backward compatibility
+  Future<void> _pickImage() async {
+    await _showChangeProfileImageDialog();
   }
 
   Future<void> _saveProfile() async {
@@ -116,13 +309,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isSaving = true);
 
     try {
-      // อัปโหลดรูปภาพใหม่ถ้ามีการเลือก
-      if (_selectedImage != null) {
-        await UserService.updateProfileImage(user.uid, _selectedImage!);
-      }
+      // ไม่ต้องอัปโหลดรูปภาพไป Firebase Storage แล้ว
+      // รูปภาพจะถูกเก็บใน local storage
 
       // อัปเดต display name ใน Firebase Auth
-      if (_nameController.text.isNotEmpty && _nameController.text != user.displayName) {
+      if (_nameController.text.isNotEmpty &&
+          _nameController.text != user.displayName) {
         await user.updateDisplayName(_nameController.text);
       }
 
@@ -167,9 +359,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -213,17 +403,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           backgroundImage: _selectedImage != null
                               ? FileImage(_selectedImage!)
                               : (_currentPhotoURL != null
-                                  ? NetworkImage(_currentPhotoURL!)
-                                  : null), // แสดงรูป custom หรือรูป Google
-                          child: _selectedImage == null && _currentPhotoURL == null
-                              ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                                    ? NetworkImage(_currentPhotoURL!)
+                                    : null), // แสดงรูป custom หรือรูป Google
+                          child:
+                              _selectedImage == null && _currentPhotoURL == null
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: Colors.grey,
+                                )
                               : null,
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
                           child: GestureDetector(
-                            onTap: _pickImage,
+                            onTap:
+                                _showChangeProfileImageDialog, // เปลี่ยนเป็นใช้ dialog
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: const BoxDecoration(
@@ -244,16 +440,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     // แสดงสถานะการล็อกอิน
                     if (user != null && GoogleAuthService.isGoogleUser(user))
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.blue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          border: Border.all(
+                            color: Colors.blue.withOpacity(0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.account_circle, size: 16, color: Colors.blue[700]),
+                            Icon(
+                              Icons.account_circle,
+                              size: 16,
+                              color: Colors.blue[700],
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'เข้าสู่ระบบด้วย Google',
@@ -271,10 +476,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     if (user != null && GoogleAuthService.isGoogleUser(user))
                       Text(
                         'คุณสามารถเปลี่ยนรูปโปรไฟล์ที่แสดงในแอปได้',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         textAlign: TextAlign.center,
                       ),
                   ],
@@ -388,7 +590,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                   child: _isSaving
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('บันทึกข้อมูล', style: TextStyle(fontSize: 16)),
+                      : const Text(
+                          'บันทึกข้อมูล',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
             ],

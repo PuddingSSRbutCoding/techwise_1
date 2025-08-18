@@ -79,7 +79,10 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
   }
 
   Future<void> _init() async {
-    final hide = await LocalPrefs.I.getHideLessonContentFor(_subject, widget.lesson);
+    final hide = await LocalPrefs.I.getHideLessonContentFor(
+      _subject,
+      widget.lesson,
+    );
 
     Set<int> comp = {...widget.completedStages};
     Map<int, Map<String, dynamic>> scores = {};
@@ -87,17 +90,23 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     if (user != null) {
       try {
         comp = await ProgressService.I.loadCompletedStages(
-          uid: user.uid, subject: _subject, lesson: widget.lesson,
+          uid: user.uid,
+          subject: _subject,
+          lesson: widget.lesson,
         );
         // โหลดคะแนนทั้งหมดของบทเรียนนี้
         scores = await ProgressService.I.getAllLessonScores(
-          uid: user.uid, subject: _subject, lesson: widget.lesson,
+          uid: user.uid,
+          subject: _subject,
+          lesson: widget.lesson,
         );
       } catch (_) {}
     }
 
     final detected = await _detectTotalStages(widget.lesson);
-    final total = detected > 0 ? detected : (_fallbackStages[widget.lesson] ?? 3);
+    final total = detected > 0
+        ? detected
+        : (_fallbackStages[widget.lesson] ?? 3);
 
     if (!mounted) return;
     setState(() {
@@ -137,8 +146,13 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
 
     // 2) fallback: scan ทั้งคอลเลกชัน แล้วกรองจาก prefix id
     try {
-      final all = await FirebaseFirestore.instance.collection('lesson_com').get();
-      final prefix = '$_subject' '_$lesson' '_'; // e.g. computer_1_
+      final all = await FirebaseFirestore.instance
+          .collection('lesson_com')
+          .get();
+      final prefix =
+          '$_subject'
+          '_$lesson'
+          '_'; // e.g. computer_1_
       for (final d in all.docs) {
         if (!d.id.startsWith(prefix)) continue;
         final data = d.data();
@@ -209,9 +223,75 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     return 0;
   }
 
+  /// ตรวจสอบว่าผ่านทุกบทเรียนแล้วหรือไม่
+  Future<bool> _checkAllLessonsCompleted() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      // ตรวจสอบว่าผ่านทุกบทเรียนแล้วหรือไม่
+      for (int lesson = 1; lesson <= kTotalLessons; lesson++) {
+        final completed = await ProgressService.I.loadCompletedStages(
+          uid: user.uid,
+          subject: _subject,
+          lesson: lesson,
+        );
+        
+        // ตรวจสอบจำนวนด่านที่ต้องผ่าน
+        final requiredStages = _fallbackStages[lesson] ?? 4;
+        if (completed.length < requiredStages) {
+          return false; // ยังไม่ผ่านบทเรียนนี้
+        }
+      }
+      return true; // ผ่านทุกบทเรียนแล้ว
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> _setHide(bool v) async {
     setState(() => _hide = v);
     await LocalPrefs.I.setHideLessonContentFor(_subject, widget.lesson, v);
+  }
+
+  /// แสดง dialog แจ้งเตือนเมื่อซ่อนเนื้อหา
+  Future<void> _showHideContentDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('แจ้งเตือน'),
+          ],
+        ),
+        content: const Text(
+          'หากกดซ่อนเนื้อหานี้แล้ว จะไม่พบเอกสารก่อนเข้าเรียน\n\n'
+          'คุณต้องการซ่อนเนื้อหาหรือไม่?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  Colors.red, // ✅ เปลี่ยนจาก Colors.orange เป็น Colors.red
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('ซ่อนเนื้อหา'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _setHide(true);
+    }
   }
 
   Future<void> _openStage(int stage) async {
@@ -265,7 +345,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
           ),
         ),
       );
-      
+
       // ถ้าผู้ใช้กดย้อนกลับจากหน้าเนื้อหา (result เป็น null) ไม่ต้องไปทำแบบทดสอบ
       if (result == null) {
         return;
@@ -332,8 +412,10 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
           children: [
             const Icon(Icons.check_circle, size: 42, color: Colors.green),
             const SizedBox(height: 8),
-            Text('ผ่านด่าน $stage แล้ว!',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(
+              'ผ่านด่าน $stage แล้ว!',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -363,80 +445,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
     );
   }
 
-  /// แสดงไดอะล็อกรีเซ็ตความคืบหน้า
-  void _showResetDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('รีเซ็ตความคืบหน้า'),
-        content: const Text(
-          'คุณต้องการรีเซ็ตความคืบหน้าของบทเรียนนี้หรือไม่?\n\n'
-          'การรีเซ็ตจะลบคะแนนและสถานะการผ่านด่านทั้งหมดของบทเรียนนี้',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _resetProgress();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('รีเซ็ต'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// รีเซ็ตความคืบหน้าของบทเรียน
-  Future<void> _resetProgress() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      setState(() => _loading = true);
-      
-      await ProgressService.I.resetLessonProgress(
-        uid: user.uid,
-        subject: _subject,
-        lesson: widget.lesson,
-      );
-      
-      setState(() {
-        _completed.clear();
-        _justUnlocked = null;
-        _stageScores.clear();
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('รีเซ็ตความคืบหน้าเรียบร้อยแล้ว'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
+  // ฟังก์ชันรีเซ็ตถูกลบออกแล้ว เหลือแค่ปุ่มรีเซ็ตหลักในหน้าเลือกวิชา
 
   @override
   Widget build(BuildContext context) {
@@ -483,8 +492,18 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                         onPressed: _goBack,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(8),
+                          minimumSize: const Size(44, 44),
+                        ),
                       ),
                       Expanded(
                         child: Center(
@@ -497,24 +516,35 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                           ),
                         ),
                       ),
-                      // ปุ่มรีเซ็ต
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _showResetDialog,
-                        tooltip: 'รีเซ็ตความคืบหน้า',
-                      ),
+                      // ปุ่มรีเซ็ตถูกลบออกแล้ว เหลือแค่ปุ่มรีเซ็ตหลักในหน้าเลือกวิชา
                       Padding(
                         padding: const EdgeInsets.only(right: 12),
                         child: _loading
                             ? const SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Row(
                                 children: [
-                                  const Text('ซ่อนเนื้อหา', style: TextStyle(fontSize: 12)),
-                                  Switch(value: _hide, onChanged: _setHide),
+                                  const Text(
+                                    'ซ่อนเนื้อหา',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  Switch(
+                                    value: _hide,
+                                    onChanged: (value) {
+                                      if (value) {
+                                        // ถ้าต้องการซ่อนเนื้อหา ให้แสดง dialog
+                                        _showHideContentDialog();
+                                      } else {
+                                        // ถ้าต้องการแสดงเนื้อหา ให้ทำทันที
+                                        _setHide(false);
+                                      }
+                                    },
+                                  ),
                                 ],
                               ),
                       ),
@@ -530,32 +560,41 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
               child: Center(
                 child: _loading
                     ? const CircularProgressIndicator(strokeWidth: 2)
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(_totalStages, (i) {
-                            final stage = i + 1;
-                            final done = _completed.contains(stage);
-                            final locked = stage != 1 && !_completed.contains(stage - 1);
+                    : FutureBuilder<bool>(
+                        future: _checkAllLessonsCompleted(),
+                        builder: (context, snapshot) {
+                          final allLessonsCompleted = snapshot.data ?? false;
+                          
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.only(bottom: 32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(_totalStages, (i) {
+                                final stage = i + 1;
+                                final done = _completed.contains(stage);
+                                final locked =
+                                    stage != 1 && !_completed.contains(stage - 1);
 
-                            return Column(
-                              children: [
-                                Opacity(
-                                  opacity: locked ? 0.55 : 1,
-                                  child: _HexStackBadge(
-                                    number: stage,
-                                    completed: done,
-                                    unlocking: _justUnlocked == stage,
-                                    onTap: () => _openStage(stage),
-                                    stageScore: _stageScores[stage],
-                                  ),
-                                ),
-                                if (stage != _totalStages) _ThickConnector(),
-                              ],
-                            );
-                          }),
-                        ),
+                                return Column(
+                                  children: [
+                                    Opacity(
+                                      opacity: locked ? 0.55 : 1,
+                                      child: _HexStackBadge(
+                                        number: stage,
+                                        completed: done,
+                                        unlocking: _justUnlocked == stage,
+                                        onTap: () => _openStage(stage),
+                                        stageScore: _stageScores[stage],
+                                        allLessonsCompleted: allLessonsCompleted,
+                                      ),
+                                    ),
+                                    if (stage != _totalStages) _ThickConnector(),
+                                  ],
+                                );
+                              }),
+                            ),
+                          );
+                        },
                       ),
               ),
             ),
@@ -592,9 +631,10 @@ class _ThickConnector extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: [Color(0xFF1F1F1F), Color(0xFF2E2E2E), Color(0xFF1F1F1F)],
         ),
-        boxShadow: [
-          BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, 4))
-        ],
+        // ✅ ลบ shadow ออก
+        // boxShadow: [
+        //   BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, 4)),
+        // ],
       ),
     );
   }
@@ -606,6 +646,7 @@ class _HexStackBadge extends StatelessWidget {
   final bool unlocking;
   final VoidCallback onTap;
   final Map<String, dynamic>? stageScore;
+  final bool allLessonsCompleted; // เพิ่ม parameter ใหม่
 
   const _HexStackBadge({
     required this.number,
@@ -613,14 +654,17 @@ class _HexStackBadge extends StatelessWidget {
     required this.unlocking,
     required this.onTap,
     this.stageScore,
+    this.allLessonsCompleted = false, // ค่าเริ่มต้นเป็น false
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color mainFill =
-        completed ? const Color(0xFF06C167) : const Color(0xFFE0E0E0);
-    final Color numberColor =
-        completed ? Colors.white : const Color(0xFF666666);
+    final Color mainFill = completed
+        ? const Color(0xFF06C167)
+        : const Color(0xFFE0E0E0);
+    final Color numberColor = completed
+        ? Colors.white
+        : const Color(0xFF666666);
 
     return GestureDetector(
       onTap: onTap,
@@ -635,19 +679,20 @@ class _HexStackBadge extends StatelessWidget {
               duration: const Duration(milliseconds: 480),
               curve: Curves.easeOut,
               decoration: BoxDecoration(
-                boxShadow: unlocking
-                    ? [
-                        BoxShadow(
-                          color: Colors.greenAccent.withOpacity(0.55),
-                          blurRadius: 24,
-                          spreadRadius: 2,
-                        )
-                      ]
-                    : null,
+                // ✅ ลบ shadow ออก
+                // boxShadow: unlocking
+                //     ? [
+                //         BoxShadow(
+                //           color: Colors.greenAccent.withOpacity(0.55),
+                //           blurRadius: 24,
+                //           spreadRadius: 2,
+                //         ),
+                //       ]
+                //     : null,
               ),
               child: SizedBox(
-                width: 120,
-                height: 120,
+                width: 140, // ✅ เพิ่มความกว้างจาก 120 เป็น 140
+                height: 140, // ✅ เพิ่มความสูงจาก 120 เป็น 140
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -655,27 +700,29 @@ class _HexStackBadge extends StatelessWidget {
                       Transform.translate(
                         offset: Offset(0, (depth - 1) * 6.0),
                         child: _Hexagon(
-                          size: 54,
+                          size: 64, // ✅ เพิ่มขนาดจาก 54 เป็น 64
                           fill: Colors.white,
                           borderColor: Colors.black.withOpacity(0.10),
                           borderWidth: 1.2,
-                          shadow: BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
+                          // ✅ ลบ shadow ออก
+                          // shadow: BoxShadow(
+                          //   color: Colors.black.withOpacity(0.18),
+                          //   blurRadius: 8,
+                          //   offset: const Offset(0, 4),
+                          // ),
                         ),
                       ),
                     _Hexagon(
-                      size: 54,
+                      size: 64, // ✅ เพิ่มขนาดจาก 54 เป็น 64
                       fill: mainFill,
                       borderColor: Colors.white,
                       borderWidth: 3,
-                      shadow: BoxShadow(
-                        color: Colors.black.withOpacity(0.20),
-                        blurRadius: unlocking ? 14 : 10,
-                        offset: const Offset(0, 6),
-                      ),
+                      // ✅ ลบ shadow ออก
+                      // shadow: BoxShadow(
+                      //   color: Colors.black.withOpacity(0.20),
+                      //   blurRadius: unlocking ? 14 : 10,
+                      //   offset: const Offset(0, 6),
+                      // ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -684,18 +731,22 @@ class _HexStackBadge extends StatelessWidget {
                             style: TextStyle(
                               color: numberColor,
                               fontWeight: FontWeight.w900,
-                              fontSize: 20,
+                              fontSize: 22, // ✅ เพิ่มขนาดตัวอักษรจาก 20 เป็น 22
                             ),
                           ),
                           // แสดงคะแนนถ้ามี
                           if (stageScore != null) ...[
                             const SizedBox(height: 2),
                             Text(
-                              '${stageScore!['score'] ?? 0}/${stageScore!['total'] ?? 0}',
+                              // แสดงคะแนนจริงเฉพาะเมื่อผ่านเงื่อนไขและปลดล็อคปุ่มรีเซ็ตแล้ว
+                              completed && allLessonsCompleted
+                                  ? '${stageScore!['score'] ?? 0}/${stageScore!['total'] ?? 0}'
+                                  : '??/${stageScore!['total'] ?? 0}',
                               style: TextStyle(
                                 color: numberColor,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 10,
+                                fontSize:
+                                    11, // ✅ เพิ่มขนาดตัวอักษรจาก 10 เป็น 11
                               ),
                             ),
                           ] else if (completed) ...[
@@ -705,7 +756,8 @@ class _HexStackBadge extends StatelessWidget {
                               style: TextStyle(
                                 color: numberColor,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 10,
+                                fontSize:
+                                    11, // ✅ เพิ่มขนาดตัวอักษรจาก 10 เป็น 11
                               ),
                             ),
                           ],
@@ -747,8 +799,8 @@ class _Hexagon extends StatelessWidget {
     return Container(
       width: w,
       height: h,
-      decoration:
-          BoxDecoration(boxShadow: shadow != null ? [shadow!] : null),
+      // ✅ ลบ shadow ออก
+      // decoration: BoxDecoration(boxShadow: shadow != null ? [shadow!] : null),
       child: ClipPath(
         clipper: _HexClipper(),
         child: Container(
