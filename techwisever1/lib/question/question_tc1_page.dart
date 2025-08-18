@@ -52,6 +52,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   int _index = 0;
   int _score = 0;
   int _selected = -1;
+  bool _submitting = false;
   
   // Timer variables
   Timer? _timer;
@@ -206,6 +207,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   }
 
   void _onSubmit() {
+    if (_submitting) return; // ป้องกันกดซ้ำเร็วๆ
     final quiz = _quiz;
     if (quiz == null || quiz.items.isEmpty) return;
 
@@ -234,7 +236,8 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
         _selected = -1; // รีเซ็ตการเลือกสำหรับข้อถัดไป
       });
     } else {
-      _finishQuiz();
+      _submitting = true;
+      _finishQuiz().whenComplete(() => _submitting = false);
     }
   }
 

@@ -34,7 +34,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // หยุด loading state ทันทีหลังจากเข้าหน้า main สำเร็จ
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // หยุด loading state ทันที
-      AuthStateService.instance.isLoadingUser.value = false;
+      AuthStateService.instance.stopLoadingAndClearData();
       
       // โหลดข้อมูลผู้ใช้ในพื้นหลังแบบไม่บล็อก UI (ถ้าจำเป็น)
       _loadUserDataInBackground();
@@ -90,7 +90,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         try {
           // ใช้ timeout สั้นมากเพื่อไม่ให้บล็อก UI
           await AuthStateService.instance.refreshUserData().timeout(
-            const Duration(seconds: 2),
+            const Duration(seconds: 1),
             onTimeout: () {
               debugPrint('⚠️ Background user data loading timeout - continuing anyway');
               return;

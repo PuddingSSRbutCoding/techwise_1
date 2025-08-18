@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- สีพื้นหลังของไอคอน - ใช้สีที่เหมาะสมกับไอคอน -->
     <color name="ic_launcher_background">#FFFFFF</color>
+    
+    <!-- สีเพิ่มเติมสำหรับไอคอน -->
+    <color name="ic_launcher_primary">#2196F3</color>
+    <color name="ic_launcher_accent">#FFC107</color>
 </resources>

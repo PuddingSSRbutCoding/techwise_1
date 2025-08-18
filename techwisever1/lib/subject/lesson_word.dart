@@ -31,6 +31,8 @@ class _LessonWordPageState extends State<LessonWordPage> {
   bool _isStageCompleted = false;
   Map<String, dynamic>? _stageScore;
   bool _loadingScore = true;
+  static const int _kTotalLessons = 3;
+  static const Map<int, int> _fallbackStages = {1: 4, 2: 5, 3: 4};
 
   // ✅ แคชสตรีมไว้ครั้งเดียว แก้ปัญหากระพริบ/เลื่อนไม่ได้
   late final Stream<Map<String, dynamic>?> _contentStream;
@@ -144,6 +146,30 @@ class _LessonWordPageState extends State<LessonWordPage> {
     );
   }
 
+  /// ตรวจสอบว่าปลดล็อคปุ่มรีเซ็ตแล้วหรือยัง (ผ่านทุกบทเรียนแล้ว)
+  Future<bool> _isResetUnlocked() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      for (int lesson = 1; lesson <= _kTotalLessons; lesson++) {
+        final completed = await ProgressService.I.loadCompletedStages(
+          uid: user.uid,
+          subject: widget.subject,
+          lesson: lesson,
+        );
+
+        final requiredStages = _fallbackStages[lesson] ?? 4;
+        if (completed.length < requiredStages) {
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // throttle: เปลี่ยนเกิน 1% ค่อย setState
   void _updateProgress() {
     if (!_scrollCtrl.hasClients) return;
@@ -226,24 +252,13 @@ class _LessonWordPageState extends State<LessonWordPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'ด่านนี้ทำสำเร็จแล้ว!',
+                    'ด่านนี้สำเร็จแล้ว!',
                     style: TextStyle(
                       color: Colors.green.shade800,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 16,
                     ),
                   ),
-                  if (_stageScore != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'คะแนน: ${_stageScore!['score'] ?? 0}/${_stageScore!['total'] ?? 0}',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

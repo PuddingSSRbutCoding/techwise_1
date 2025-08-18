@@ -443,14 +443,6 @@ class _ComputerTechPageState extends State<ComputerTechPage> with AutomaticKeepA
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.home, color: Colors.indigo),
-                        onPressed: () => _goHome(context),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.person, color: Colors.indigo),
-                        onPressed: () => _goProfile(context),
-                      ),
                       // ปุ่มรีเฟรชคะแนน
                       IconButton(
                         icon: const Icon(Icons.refresh, color: Colors.indigo),
@@ -508,92 +500,99 @@ class _ComputerTechPageState extends State<ComputerTechPage> with AutomaticKeepA
                     builder: (context, subjectSnapshot) {
                       final allLessonsCompleted = subjectSnapshot.data ?? false;
 
-                      return SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            ..._lessons.map((meta) {
-                              final l = meta.lesson;
-                              final isUnlocked = l == 1 ? true : completed.contains(l - 1);
-                              final lockReason = l == 1 ? null : 'ปลดล็อกเมื่อผ่านบทที่ ${l - 1}';
-                              final scores = lessonScores[l];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                child: _LessonCard(
-                                  title: meta.title,
-                                  imagePath: meta.image,
-                                  locked: !isUnlocked,
-                                  lockReason: lockReason,
-                                  scores: scores,
-                                  onTap: () {
-                                    if (!isUnlocked) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => LessonIntroPage(
-                                          subject: 'computer',
-                                          lesson: l,
-                                          title: meta.cleanTitle,
-                                          intro: meta.intro,
-                                          heroAsset: meta.image,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  allLessonsCompleted: allLessonsCompleted, // ส่งค่าไปยัง _LessonCard
-                                ),
-                              );
-                            }).toList(),
+                      return FutureBuilder<bool>(
+                        future: _checkAdminStatus(),
+                        builder: (context, adminSnapshot) {
+                          final isAdmin = adminSnapshot.data ?? false;
 
-                            // ปุ่มรีเซ็ต - แสดงเมื่อผ่านทุกบทเรียนแล้ว
-                            if (allLessonsCompleted)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                                child: Container(
-                                  width: double.infinity,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(20),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFFF6B6B), Color(0xFFEE5A52)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
+                          return SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                ..._lessons.map((meta) {
+                                  final l = meta.lesson;
+                                  final isUnlocked = isAdmin || l == 1 || completed.contains(l - 1);
+                                  final lockReason = l == 1 ? null : 'ปลดล็อกเมื่อผ่านบทที่ ${l - 1}';
+                                  final scores = lessonScores[l];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 20),
+                                    child: _LessonCard(
+                                      title: meta.title,
+                                      imagePath: meta.image,
+                                      locked: !isUnlocked,
+                                      lockReason: lockReason,
+                                      scores: scores,
+                                      onTap: () {
+                                        if (!isUnlocked) return;
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => LessonIntroPage(
+                                              subject: 'computer',
+                                              lesson: l,
+                                              title: meta.cleanTitle,
+                                              intro: meta.intro,
+                                              heroAsset: meta.image,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      allLessonsCompleted: allLessonsCompleted, // ส่งค่าไปยัง _LessonCard
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.red.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: () => _showResetDialog(context),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      shape: RoundedRectangleBorder(
+                                  );
+                                }).toList(),
+
+                                // ปุ่มรีเซ็ต - แสดงเมื่อผ่านทุกบทเรียนแล้ว
+                                if (allLessonsCompleted)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: 60,
+                                      decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(20),
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFFF6B6B), Color(0xFFEE5A52)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.red.withOpacity(0.3),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.refresh, color: Colors.white, size: 24),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'รีเซ็ตเพื่อทำใหม่ทั้งหมด',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                      child: ElevatedButton(
+                                        onPressed: () => _showResetDialog(context),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(20),
                                           ),
                                         ),
-                                      ],
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.refresh, color: Colors.white, size: 24),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'รีเซ็ตเพื่อทำใหม่ทั้งหมด',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                          ],
-                        ),
+                              ],
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -712,7 +711,7 @@ class _LessonCard extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      // แสดงคะแนนจริงเฉพาะเมื่อผ่านเงื่อนไขและปลดล็อคปุ่มรีเซ็ตแล้ว
+                      // แสดงคะแนนจริงเฉพาะเมื่อผ่านเงื่อนไขและปลดล็อกปุ่มรีเซ็ตแล้ว
                       scores!['isCompleted'] == true && allLessonsCompleted
                           ? 'ได้คะแนน ${scores!['score']}/${scores!['total']}'
                           : '??/${scores!['total']}',

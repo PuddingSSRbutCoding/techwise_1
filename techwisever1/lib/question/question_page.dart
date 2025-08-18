@@ -57,6 +57,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   int _index = 0;
   int _score = 0;
   int _selected = -1;
+  bool _submitting = false;
   
   // Timer variables
   Timer? _timer;
@@ -172,16 +173,26 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       return keys.map((k) => (map[k] ?? '').toString().trim()).toList();
     }
 
-    // 3) A/B/C/D แยกคีย์
+    // 3) A/B/C/D แยกคีย์ (รองรับตัวพิมพ์เล็กด้วย)
     const abcd = ['A', 'B', 'C', 'D'];
     if (abcd.any((k) => m[k] != null)) {
       return abcd.map((k) => (m[k] ?? '').toString().trim()).toList();
+    }
+    const abcdLower = ['a', 'b', 'c', 'd'];
+    if (abcdLower.any((k) => m[k] != null)) {
+      return abcdLower.map((k) => (m[k] ?? '').toString().trim()).toList();
     }
 
     // 4) option1..option4
     const opt = ['option1', 'option2', 'option3', 'option4'];
     if (opt.any((k) => m[k] != null)) {
       return opt.map((k) => (m[k] ?? '').toString().trim()).toList();
+    }
+
+    // 4.1) คีย์ตัวเลขเปล่า '1'..'4'
+    const numKeys = ['1', '2', '3', '4'];
+    if (numKeys.any((k) => m[k] != null)) {
+      return numKeys.map((k) => (m[k] ?? '').toString().trim()).toList();
     }
 
     // 5) answers/choices เป็น List
@@ -193,6 +204,42 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
     if (choices is List) {
       return choices.map((e) => (e ?? '').toString().trim()).toList();
     }
+
+    // 6) Fallback: รวบรวมคีย์ที่มีรูปแบบ option/choice + (1..4|A..D) แบบ case-insensitive
+    try {
+      final Map<int, String> indexToValue = {};
+      for (final entry in m.entries) {
+        final key = entry.key.toString();
+        var val = (entry.value ?? '').toString().trim();
+        if (val.isEmpty) continue;
+        final lower = key.toLowerCase().replaceAll(' ', '').replaceAll('_', '').replaceAll('-', '');
+        // ตัวอย่างที่รองรับ: option1, optiona, choice2, optB, choices3, etc.
+        final matchNum = RegExp(r'^(option|choice|choices|opt)(\d+)$');
+        final matchLetter = RegExp(r'^(option|choice|choices|opt)([abcd])$');
+        final mn = matchNum.firstMatch(lower);
+        if (mn != null) {
+          final n = int.tryParse(mn.group(2) ?? '');
+          if (n != null && n >= 1 && n <= 4) {
+            indexToValue[n - 1] = val;
+            continue;
+          }
+        }
+        final ml = matchLetter.firstMatch(lower);
+        if (ml != null) {
+          final letter = (ml.group(2) ?? '').toUpperCase();
+          const mapABCD = {'A': 0, 'B': 1, 'C': 2, 'D': 3};
+          final idx = mapABCD[letter];
+          if (idx != null) {
+            indexToValue[idx] = val;
+            continue;
+          }
+        }
+      }
+      if (indexToValue.isNotEmpty) {
+        // จัดเรียงตาม index แล้วคืนค่า
+        return List.generate(4, (i) => indexToValue[i] ?? '').map((e) => e.trim()).toList();
+      }
+    } catch (_) {}
 
     return const <String>[];
   }
@@ -381,6 +428,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
   }
 
   void _onSubmit() {
+    if (_submitting) return; // กันกดรัว
     final quiz = _quiz;
     if (quiz == null || quiz.items.isEmpty) return;
 
@@ -414,7 +462,8 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
       _timer = null;
       _startTimer();
     } else {
-      _finishQuiz();
+      _submitting = true;
+      _finishQuiz().whenComplete(() => _submitting = false);
     }
   }
 
@@ -468,7 +517,7 @@ class _QuestionTC1PageState extends State<QuestionTC1Page> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);         // ปิด dialog
-              Navigator.pop(context, passed); // กลับแผนที่ (true เฉพาะผ่าน)
+              Navigator.pop(context, {'passed': passed, 'shouldRefresh': true}); // กลับแผนที่พร้อมส่งข้อมูล refresh
             },
             child: const Text('กลับแผนที่'),
           ),

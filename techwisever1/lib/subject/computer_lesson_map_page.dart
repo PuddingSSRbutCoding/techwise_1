@@ -7,6 +7,7 @@ import 'package:techwisever1/subject/lesson_word.dart';
 import 'package:techwisever1/question/question_page.dart';
 import 'package:techwisever1/services/local_prefs.dart';
 import 'package:techwisever1/services/progress_service.dart';
+import 'package:techwisever1/services/user_service.dart';
 
 class ComputerLessonMapPage extends StatefulWidget {
   final int lesson;
@@ -35,6 +36,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
   int? _justUnlocked;
   int _totalStages = 3;
   Map<int, Map<String, dynamic>> _stageScores = {};
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -100,6 +102,8 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
           subject: _subject,
           lesson: widget.lesson,
         );
+        // ตรวจสอบสิทธิ์แอดมิน
+        _isAdmin = await UserService.isAdmin(user.uid);
       } catch (_) {}
     }
 
@@ -295,7 +299,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
   }
 
   Future<void> _openStage(int stage) async {
-    final locked = stage != 1 && !_completed.contains(stage - 1);
+    final locked = !_isAdmin && stage != 1 && !_completed.contains(stage - 1);
     if (locked) {
       _showInfo('ด่านนี้ยังไม่ปลดล็อก', 'กรุณาผ่านด่าน ${stage - 1} ก่อน');
       return;
@@ -351,7 +355,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
         return;
       }
     }
-    final passed = await Navigator.push<bool>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => QuestionTC1Page(
@@ -361,23 +365,35 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
         ),
       ),
     );
-    if (passed == true) {
-      setState(() {
-        _completed.add(stage);
-        _justUnlocked = stage;
-      });
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        try {
-          await ProgressService.I.addCompletedStage(
-            uid: user.uid,
-            subject: _subject,
-            lesson: widget.lesson,
-            stage: stage,
-          );
-        } catch (_) {}
+    
+    // ตรวจสอบผลลัพธ์และ refresh ถ้าจำเป็น
+    if (result != null) {
+      final passed = result['passed'] as bool? ?? false;
+      final shouldRefresh = result['shouldRefresh'] as bool? ?? false;
+      
+      if (shouldRefresh) {
+        // Refresh ข้อมูลบทเรียน
+        await _refreshLessonData();
       }
-      _showPassedSheet(stage);
+      
+      if (passed) {
+        setState(() {
+          _completed.add(stage);
+          _justUnlocked = stage;
+        });
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            await ProgressService.I.addCompletedStage(
+              uid: user.uid,
+              subject: _subject,
+              lesson: widget.lesson,
+              stage: stage,
+            );
+          } catch (_) {}
+        }
+        _showPassedSheet(stage);
+      }
     }
   }
 
@@ -443,6 +459,12 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
         ),
       ),
     );
+  }
+
+  /// Refresh ข้อมูลบทเรียน
+  Future<void> _refreshLessonData() async {
+    print('🔄 Refreshing computer lesson data...');
+    await _init();
   }
 
   // ฟังก์ชันรีเซ็ตถูกลบออกแล้ว เหลือแค่ปุ่มรีเซ็ตหลักในหน้าเลือกวิชา
@@ -529,9 +551,9 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                               )
                             : Row(
                                 children: [
-                                  const Text(
-                                    'ซ่อนเนื้อหา',
-                                    style: TextStyle(fontSize: 12),
+                                  Text(
+                                    _hide ? 'เข้าสู่แบบทดสอบทันที' : 'เข้าเนื้อหาก่อน',
+                                    style: const TextStyle(fontSize: 12),
                                   ),
                                   Switch(
                                     value: _hide,
@@ -572,7 +594,7 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
                               children: List.generate(_totalStages, (i) {
                                 final stage = i + 1;
                                 final done = _completed.contains(stage);
-                                final locked =
+                                final locked = !_isAdmin &&
                                     stage != 1 && !_completed.contains(stage - 1);
 
                                 return Column(
@@ -601,12 +623,12 @@ class _ComputerLessonMapPageState extends State<ComputerLessonMapPage> {
           ],
         ),
 
-        // Bottom Nav
+        // Bottom Nav (ใช้ข้อความเดียวกับหน้า Main)
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: 0,
           onTap: (i) => i == 0 ? _goHome() : _goProfile(),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'หน้าหลัก'),
+            BottomNavigationBarItem(icon: Icon(Icons.school), label: 'บทเรียน'),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'โปรไฟล์'),
           ],
         ),

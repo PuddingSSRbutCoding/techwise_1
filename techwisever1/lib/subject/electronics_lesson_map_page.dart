@@ -7,6 +7,7 @@ import 'package:techwisever1/subject/lesson_word.dart';
 import 'package:techwisever1/question/question_page.dart';
 import 'package:techwisever1/services/local_prefs.dart';
 import 'package:techwisever1/services/progress_service.dart';
+import 'package:techwisever1/services/user_service.dart';
 
 class ElectronicsLessonMapPage extends StatefulWidget {
   final int lesson;
@@ -36,6 +37,7 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
   int? _justUnlocked;
   int _totalStages = 3;
   Map<int, Map<String, dynamic>> _stageScores = {};
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -101,6 +103,8 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
           subject: _subject,
           lesson: widget.lesson,
         );
+        // ตรวจสอบสิทธิ์แอดมิน
+        _isAdmin = await UserService.isAdmin(user.uid);
       } catch (_) {}
     }
 
@@ -296,8 +300,8 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
   }
 
   Future<void> _openStage(int stage) async {
-    // ล็อกด่านถ้ายังไม่ผ่านด่านก่อนหน้า
-    final locked = stage != 1 && !_completed.contains(stage - 1);
+    // ล็อกด่านถ้ายังไม่ผ่านด่านก่อนหน้า (แต่แอดมินข้ามได้)
+    final locked = !_isAdmin && stage != 1 && !_completed.contains(stage - 1);
     if (locked) {
       _showInfo('ด่านนี้ยังไม่ปลดล็อก', 'กรุณาผ่านด่าน ${stage - 1} ก่อน');
       return;
@@ -356,7 +360,7 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
     }
 
     // แล้วเข้าหน้าคำถาม
-    final passed = await Navigator.push<bool>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => QuestionTC1Page(
@@ -366,26 +370,37 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
         ),
       ),
     );
-
-    if (passed == true) {
-      setState(() {
-        _completed.add(stage);
-        _justUnlocked = stage;
-      });
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        try {
-          await ProgressService.I.addCompletedStage(
-            uid: user.uid,
-            subject: _subject,
-            lesson: widget.lesson,
-            stage: stage,
-          );
-        } catch (_) {}
+    
+    // ตรวจสอบผลลัพธ์และ refresh ถ้าจำเป็น
+    if (result != null) {
+      final passed = result['passed'] as bool? ?? false;
+      final shouldRefresh = result['shouldRefresh'] as bool? ?? false;
+      
+      if (shouldRefresh) {
+        // Refresh ข้อมูลบทเรียน
+        await _refreshLessonData();
       }
+      
+      if (passed) {
+        setState(() {
+          _completed.add(stage);
+          _justUnlocked = stage;
+        });
 
-      _showPassedSheet(stage);
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            await ProgressService.I.addCompletedStage(
+              uid: user.uid,
+              subject: _subject,
+              lesson: widget.lesson,
+              stage: stage,
+            );
+          } catch (_) {}
+        }
+
+        _showPassedSheet(stage);
+      }
     }
   }
 
@@ -451,6 +466,12 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
         ),
       ),
     );
+  }
+
+  /// Refresh ข้อมูลบทเรียน
+  Future<void> _refreshLessonData() async {
+    print('🔄 Refreshing electronics lesson data...');
+    await _init();
   }
 
   // ฟังก์ชันรีเซ็ตถูกลบออกแล้ว เหลือแค่ปุ่มรีเซ็ตหลักในหน้าเลือกวิชา
@@ -537,9 +558,9 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
                               )
                             : Row(
                                 children: [
-                                  const Text(
-                                    'ซ่อนเนื้อหา',
-                                    style: TextStyle(fontSize: 12),
+                                  Text(
+                                    _hide ? 'เข้าสู่แบบทดสอบทันที' : 'เข้าเนื้อหาก่อน',
+                                    style: const TextStyle(fontSize: 12),
                                   ),
                                   Switch(
                                     value: _hide,
@@ -582,7 +603,7 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
                                 ...List.generate(_totalStages, (i) {
                                   final stage = i + 1;
                                   final done = _completed.contains(stage);
-                                  final locked =
+                                  final locked = !_isAdmin &&
                                       stage != 1 && !_completed.contains(stage - 1);
 
                                   return Column(
@@ -612,12 +633,12 @@ class _ElectronicsLessonMapPageState extends State<ElectronicsLessonMapPage> {
           ],
         ),
 
-        // Bottom Nav
+        // Bottom Nav (สไตล์เดียวกับหน้า Main)
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: 0,
           onTap: (i) => i == 0 ? _goHome() : _goProfile(),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'หน้าหลัก'),
+            BottomNavigationBarItem(icon: Icon(Icons.school), label: 'บทเรียน'),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'โปรไฟล์'),
           ],
         ),

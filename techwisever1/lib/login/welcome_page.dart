@@ -5,6 +5,7 @@ import '../services/user_service.dart';
 import '../services/loading_utils.dart';
 import '../services/auth_utils.dart';
 import '../services/fast_auth_service.dart';
+import '../services/auth_state_service.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -62,6 +63,11 @@ class _WelcomePageState extends State<WelcomePage>
 
     // ✅ Simulate background loading
     _simulateBackgroundLoading();
+
+    // หยุด loading state ทันทีหลังจากเข้าหน้า welcome สำเร็จ
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AuthStateService.instance.stopLoadingAndClearData();
+    });
   }
 
   void _startAnimations() {

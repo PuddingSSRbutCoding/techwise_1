@@ -137,8 +137,6 @@ class ProfilePage extends StatelessWidget {
                   },
                 ),
 
-
-
                 buildProfileMenu(
                   icon: Icons.logout,
                   text: 'ออกจากระบบ',
@@ -190,6 +188,7 @@ class ProfilePage extends StatelessWidget {
                 ),
 
                 const Spacer(),
+
                 const Padding(
                   padding: EdgeInsets.only(bottom: 10),
                   child: Text(
@@ -204,8 +203,6 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
-
-
 
   Future<void> _signOut(BuildContext context) async {
     // แสดง confirmation dialog ก่อน logout

@@ -35,9 +35,7 @@ class AuthStateService {
 
     if (user == null) {
       // ผู้ใช้ออกจากระบบ - รีเซ็ตสถานะทันทีและล้างข้อมูลทั้งหมด
-      isLoadingUser.value = false;
-      userData.value = null;
-      error.value = null;
+      stopLoadingAndClearData();
       debugPrint('🔄 Auth state cleared - user signed out');
       return;
     }
@@ -83,8 +81,8 @@ class AuthStateService {
     isLoadingUser.value = true;
     error.value = null;
 
-    // ลด timeout เป็น 2 วินาที เพื่อให้ responsive มากขึ้น
-    _timeoutTimer = Timer(const Duration(seconds: 2), () {
+    // ลด timeout เป็น 1.5 วินาที เพื่อให้ responsive มากขึ้น
+    _timeoutTimer = Timer(const Duration(milliseconds: 1500), () {
       if (isLoadingUser.value) {
         debugPrint('⚠️ User data loading timeout - using fallback immediately');
         isLoadingUser.value = false;
@@ -121,9 +119,9 @@ class AuthStateService {
         return;
       }
 
-      // ใช้ timeout ใน UserService call ที่สั้นกว่า (1.5 วินาที)
+      // ใช้ timeout ใน UserService call ที่สั้นกว่า (1 วินาที)
       final data = await UserService.getUserData(uid).timeout(
-        const Duration(milliseconds: 1500),
+        const Duration(seconds: 1),
         onTimeout: () {
           debugPrint('⚠️ UserService.getUserData timeout - using fallback');
           return null;
@@ -204,8 +202,8 @@ class AuthStateService {
     isLoadingUser.value = true;
     error.value = null;
 
-    // ลด timeout เป็น 3 วินาที เพื่อให้ responsive มากขึ้น
-    _timeoutTimer = Timer(const Duration(seconds: 3), () {
+    // ลด timeout เป็น 2 วินาที เพื่อให้ responsive มากขึ้น
+    _timeoutTimer = Timer(const Duration(seconds: 2), () {
       if (isLoadingUser.value) {
         debugPrint('⚠️ User data loading timeout');
         isLoadingUser.value = false;
@@ -244,7 +242,7 @@ class AuthStateService {
 
       // ใช้ timeout ใน UserService call ที่สั้นกว่า
       final data = await UserService.getUserData(uid).timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 1),
         onTimeout: () {
           debugPrint('⚠️ UserService.getUserData timeout');
           return null;
@@ -320,7 +318,7 @@ class AuthStateService {
           displayName: user.displayName,
           photoURL: user.photoURL,
         ).timeout(
-          const Duration(seconds: 2),
+          const Duration(seconds: 1),
           onTimeout: () {
             debugPrint('⚠️ User creation timeout - using fallback');
             throw TimeoutException('User creation timeout');
@@ -330,7 +328,7 @@ class AuthStateService {
         // โหลดข้อมูลใหม่หลังจากสร้าง
         final data = await UserService.getUserData(
           uid,
-        ).timeout(const Duration(seconds: 1), onTimeout: () => null);
+        ).timeout(const Duration(milliseconds: 800), onTimeout: () => null);
         userData.value = data;
         debugPrint('✅ New user data created and loaded');
       }
@@ -350,10 +348,19 @@ class AuthStateService {
           email: user.email ?? '',
           displayName: user.displayName,
           photoURL: user.photoURL,
+        ).timeout(
+          const Duration(seconds: 1),
+          onTimeout: () {
+            debugPrint('⚠️ User creation timeout - using fallback');
+            throw TimeoutException('User creation timeout');
+          },
         );
 
         // โหลดข้อมูลใหม่หลังจากสร้าง
-        final data = await UserService.getUserData(uid);
+        final data = await UserService.getUserData(uid).timeout(
+          const Duration(milliseconds: 800),
+          onTimeout: () => null,
+        );
         userData.value = data;
         debugPrint('✅ New user data created and loaded');
       }
@@ -384,7 +391,20 @@ class AuthStateService {
   Future<void> refreshUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await _loadUserData(user.uid);
+      try {
+        await _loadUserData(user.uid).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            debugPrint('⚠️ Refresh user data timeout - stopping loading');
+            isLoadingUser.value = false;
+            return;
+          },
+        );
+      } catch (e) {
+        debugPrint('❌ Refresh user data failed: $e');
+        // หยุด loading state ทันทีเมื่อเกิด error
+        isLoadingUser.value = false;
+      }
     }
   }
 
@@ -395,6 +415,15 @@ class AuthStateService {
     userData.value = null;
     error.value = null;
     debugPrint('🧹 All auth data cleared');
+  }
+
+  /// หยุดการ loading และล้างข้อมูลทันที (สำหรับใช้หลังจาก login/logout สำเร็จ)
+  void stopLoadingAndClearData() {
+    _timeoutTimer?.cancel();
+    isLoadingUser.value = false;
+    userData.value = null;
+    error.value = null;
+    debugPrint('🔄 Loading stopped and data cleared after auth state change');
   }
 
   /// ตรวจสอบว่าผู้ใช้เป็น admin หรือไม่

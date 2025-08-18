@@ -68,7 +68,7 @@ class ProgressService {
     );
   }
 
-  /// บันทึกคะแนนของด่าน (เฉพาะครั้งแรกเท่านั้น - first attempt only)
+  /// บันทึกคะแนนของด่าน (บันทึกรอบล่าสุดเสมอ พร้อมเก็บคะแนนที่ดีที่สุด)
   Future<void> saveStageScore({
     required String uid,
     required String subject,
@@ -92,32 +92,21 @@ class ProgressService {
 
     final data = doc.data() as Map<String, dynamic>?;
     final existingScores = data?['scores'] as Map<String, dynamic>?;
-
-    // ตรวจสอบว่าควรบันทึกคะแนนใหม่หรือไม่
-    bool shouldSave = false;
+    // ดึงคะแนนที่ดีที่สุดก่อนหน้า (ถ้ามี)
+    int previousBest = 0;
     if (existingScores != null && existingScores.containsKey('s$stage')) {
       final existingScore = existingScores['s$stage'] as Map<String, dynamic>?;
-      final existingScoreValue = existingScore?['score'] as int? ?? 0;
-
-      // บันทึกเฉพาะเมื่อคะแนนใหม่ดีกว่า (สูงกว่า)
-      if (score > existingScoreValue) {
-        shouldSave = true;
-      } else {
-        return;
-      }
-    } else {
-      // ไม่มีคะแนนเดิม บันทึกใหม่
-      shouldSave = true;
+      previousBest = (existingScore?['bestScore'] as int?)
+              ?? (existingScore?['score'] as int? ?? 0);
     }
-
-    if (!shouldSave) return;
 
     // ตรวจสอบว่า score ไม่เกิน total
     final finalScore = score > total ? total : score;
     final finalTotal = total;
 
     final scoreData = {
-      'score': finalScore,
+      'score': finalScore, // คะแนนรอบล่าสุด
+      'bestScore': (previousBest > finalScore) ? previousBest : finalScore,
       'total': finalTotal,
       'percent': finalTotal > 0 ? (finalScore / finalTotal) : 0.0,
       'ts': FieldValue.serverTimestamp(),

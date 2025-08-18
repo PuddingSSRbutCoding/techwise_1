@@ -129,7 +129,7 @@ class _LessonIntroPageState extends State<LessonIntroPage> {
             color: Colors.white,
             size: 28,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context), // ใช้ปุ่มย้อนกลับปกติ
           style: IconButton.styleFrom(
             backgroundColor: Colors.black.withOpacity(0.3),
             foregroundColor: Colors.white,
@@ -308,9 +308,9 @@ class _LessonIntroPageState extends State<LessonIntroPage> {
   void _goToMap(BuildContext context, {bool replace = false}) {
     final lower = widget.subject.toLowerCase();
     final Widget dest = lower.startsWith('comp')
-        ? ComputerLessonMapPage(lesson: widget.lesson)
+        ? ComputerLessonMapPage(lesson: widget.lesson) // ไม่ refresh เมื่อมาจาก intro
         : lower.startsWith('elec')
-            ? ElectronicsLessonMapPage(lesson: widget.lesson)
+            ? ElectronicsLessonMapPage(lesson: widget.lesson) // ไม่ refresh เมื่อมาจาก intro
             : const _FallbackPop();
 
     if (replace) {

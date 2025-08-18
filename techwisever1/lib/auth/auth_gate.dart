@@ -19,8 +19,8 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // ลด timeout เป็น 15 วินาที เพื่อให้ responsive มากขึ้น
-    _timeoutTimer = Timer(const Duration(seconds: 15), () {
+    // ลด timeout เป็น 10 วินาที เพื่อให้ responsive มากขึ้น
+    _timeoutTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
           _isTimeout = true;
@@ -70,7 +70,7 @@ class _AuthGateState extends State<AuthGate> {
                         _isTimeout = false;
                       });
                       _timeoutTimer?.cancel();
-                      _timeoutTimer = Timer(const Duration(seconds: 15), () {
+                      _timeoutTimer = Timer(const Duration(seconds: 10), () {
                         if (mounted) {
                           setState(() {
                             _isTimeout = true;
@@ -86,9 +86,8 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        // ปรับ loading logic - ลดเวลาแสดง loading และแสดง MainScreen ทันที
+        // ปรับ loading logic - แสดง loading เฉพาะเมื่อยังไม่มีข้อมูลเลย (first time)
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          // แสดง loading เฉพาะเมื่อยังไม่มีข้อมูลเลย (first time) และลดเวลา
           return Scaffold(
             body: Center(
               child: Column(
@@ -113,17 +112,15 @@ class _AuthGateState extends State<AuthGate> {
 
         final user = snap.data;
         if (user != null) {
-          // ล็อกอินแล้ว → ไปที่ MainScreen ทันทีโดยไม่รอข้อมูล
+          // ล็อกอินแล้ว → ไปที่ MainScreen ทันที
           debugPrint('✅ Auth: User authenticated - ${user.email}');
           
           // หยุด loading state ทันทีหลังจาก login สำเร็จ
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            AuthStateService.instance.isLoadingUser.value = false;
-            // ล้างข้อมูลเก่าและรีเซ็ตสถานะ
-            AuthStateService.instance.clearAllData();
+            AuthStateService.instance.stopLoadingAndClearData();
           });
 
-          // แสดง MainScreen ทันที - ไม่ต้องรอ AuthStateService
+          // แสดง MainScreen ทันที
           return const MainScreen(initialIndex: 0);
         }
 
@@ -132,9 +129,7 @@ class _AuthGateState extends State<AuthGate> {
         
         // หยุด loading state ทันทีหลังจาก logout สำเร็จ
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          AuthStateService.instance.isLoadingUser.value = false;
-          // ล้างข้อมูลเก่าและรีเซ็ตสถานะ
-          AuthStateService.instance.clearAllData();
+          AuthStateService.instance.stopLoadingAndClearData();
         });
         
         return const WelcomePage();
