@@ -1,9 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:techwisever1/subject/electronics_page.dart';
 import 'package:techwisever1/subject/computertech_page.dart';
+import 'package:techwisever1/subject/dynamic_subject_page.dart';
 import 'package:techwisever1/services/subject_progress_service.dart';
+import 'package:techwisever1/services/ui_constants.dart';
 
 class SelectSubjectPage extends StatefulWidget {
   const SelectSubjectPage({super.key});
@@ -23,6 +26,25 @@ class _SelectSubjectPageState extends State<SelectSubjectPage>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // รายการวิชาที่มีอยู่แล้ว
+  final Map<String, Map<String, dynamic>> _existingSubjects = {
+    'computer': {
+      'title': 'คอมพิวเตอร์',
+      'image': 'assets/images/TC1.png',
+      'color': Colors.blue,
+      'page': ComputerTechPage(),
+    },
+    'electronics': {
+      'title': 'อิเล็กทรอนิกส์',
+      'image': 'assets/images/TC2.jpg',
+      'color': Colors.green,
+      'page': ElectronicsPage(),
+    },
+  };
+
+  // รายการวิชาใหม่จาก Firebase
+  List<Map<String, dynamic>> _dynamicSubjects = [];
 
   @override
   void initState() {
@@ -47,6 +69,109 @@ class _SelectSubjectPageState extends State<SelectSubjectPage>
 
     _fadeController.forward();
     _slideController.forward();
+    
+    // โหลดวิชาใหม่จาก Firebase
+    _loadDynamicSubjects();
+  }
+
+  Future<void> _loadDynamicSubjects() async {
+    try {
+      final subjectsSnapshot = await FirebaseFirestore.instance
+          .collection('subjects')
+          .get();
+      
+      final subjects = <Map<String, dynamic>>[];
+      for (final doc in subjectsSnapshot.docs) {
+        final subjectId = doc.id;
+        
+        // ข้ามวิชาที่มีอยู่แล้ว
+        if (_existingSubjects.containsKey(subjectId)) continue;
+        
+        final data = doc.data();
+        final title = data['title'] ?? _getDefaultSubjectTitle(subjectId);
+        final image = data['image'] ?? 'assets/images/TC3.png';
+        final color = _getSubjectColor(subjectId);
+        
+        subjects.add({
+          'id': subjectId,
+          'title': title,
+          'image': image,
+          'color': color,
+          'data': data,
+        });
+      }
+      
+      if (mounted) {
+        setState(() {
+          _dynamicSubjects = subjects;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dynamic subjects: $e');
+    }
+  }
+
+  String _getDefaultSubjectTitle(String subjectId) {
+    switch (subjectId) {
+      case 'programming':
+        return 'การเขียนโปรแกรม';
+      case 'mathematics':
+        return 'คณิตศาสตร์';
+      case 'science':
+        return 'วิทยาศาสตร์';
+      case 'language':
+        return 'ภาษาไทย';
+      default:
+        // แปลง subjectId เป็นชื่อภาษาไทย
+        return subjectId.split('_').map((word) {
+          if (word == 'programming') return 'การเขียนโปรแกรม';
+          if (word == 'math') return 'คณิตศาสตร์';
+          if (word == 'science') return 'วิทยาศาสตร์';
+          if (word == 'thai') return 'ภาษาไทย';
+          if (word == 'english') return 'ภาษาอังกฤษ';
+          return word;
+        }).join(' ');
+    }
+  }
+
+  Color _getSubjectColor(String subjectId) {
+    switch (subjectId) {
+      case 'programming':
+        return Colors.purple;
+      case 'mathematics':
+        return Colors.orange;
+      case 'science':
+        return Colors.teal;
+      case 'language':
+        return Colors.indigo;
+      default:
+        // สร้างสีจาก hash ของ subjectId
+        final hash = subjectId.hashCode;
+        return Color.fromARGB(255, (hash % 200) + 55, ((hash >> 8) % 200) + 55, ((hash >> 16) % 200) + 55);
+    }
+  }
+
+  void _navigateToSubject(String subjectId, Map<String, dynamic> subjectData) {
+    if (_existingSubjects.containsKey(subjectId)) {
+      // ใช้หน้าเดิม
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => _existingSubjects[subjectId]!['page'] as Widget,
+        ),
+      );
+    } else {
+      // ใช้หน้าใหม่แบบไดนามิก
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DynamicSubjectPage(
+            subjectId: subjectId,
+            subjectData: subjectData,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -56,19 +181,48 @@ class _SelectSubjectPageState extends State<SelectSubjectPage>
     super.dispose();
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ✅ ใช้ UIConstants สำหรับ AppBar
       appBar: AppBar(
-        elevation: 0, 
-        backgroundColor: Colors.transparent,
+        elevation: UIConstants.cardElevation,
+        backgroundColor: UIConstants.surfaceColor,
+        foregroundColor: UIConstants.textPrimaryColor,
+        shadowColor: UIConstants.cardShadow.first.color,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: UIConstants.appBarHeight,
+        title: Text(
+          'TechWise',
+          style: TextStyle(
+            fontSize: UIConstants.fontSizeXXLarge,
+            fontWeight: FontWeight.bold,
+            color: UIConstants.primaryColor,
+          ),
+        ),
+        centerTitle: true,
+        // เพิ่ม icon หรือปุ่มเพิ่มเติมถ้าต้องการ
+        actions: [
+          IconButton(
+            icon: Icon(Icons.info_outline, color: UIConstants.primaryColor),
+            onPressed: () {
+              // แสดงข้อมูลเกี่ยวกับแอป
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('TechWise - แอปพลิเคชันการเรียนรู้เทคโนโลยี'),
+                  duration: const Duration(seconds: 2),
+                  backgroundColor: UIConstants.primaryColor,
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
           const _GradientBackground(),
           const _DecorativeBlobs(),
+          // ✅ เพิ่ม SafeArea เพื่อแยกส่วนจาก status bar และ navigation bar
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
@@ -123,43 +277,37 @@ class _SelectSubjectPageState extends State<SelectSubjectPage>
                           crossAxisCount: cross,
                           mainAxisSpacing: 20,
                           crossAxisSpacing: 20,
-                          padding: const EdgeInsets.only(bottom: 8),
                           children: [
-                            SubjectCardCentered(
-                              key: _electronicsCardKey,
-                              accent: const Color(0xFF2196F3), // ฟ้า
-                              icon: Icons.bolt,
-                              title: 'อิเล็กทรอนิกส์',
-                              subtitle:
-                                  'เรียนรู้พื้นฐานอิเล็กทรอนิกส์ และวงจรไฟฟ้า',
-                              subjectKey: 'electronics',
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ElectronicsPage(),
-                                  ),
-                                );
-                                _electronicsCardKey.currentState
-                                    ?._loadProgress();
-                              },
-                            ),
+                            // วิชาคอมพิวเตอร์
                             SubjectCardCentered(
                               key: _computerCardKey,
-                              accent: const Color(0xFF1976D2), // ฟ้าเข้ม
+                              accent: Colors.blue,
                               icon: Icons.computer,
                               title: 'คอมพิวเตอร์',
-                              subtitle:
-                                  'เข้าใจระบบคอมพิวเตอร์ และเทคโนโลยีสารสนเทศ',
+                              subtitle: 'เข้าใจระบบคอมพิวเตอร์ และเทคโนโลยีสารสนเทศ',
                               subjectKey: 'computer',
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ComputerTechPage(),
-                                  ),
-                                );
-                                _computerCardKey.currentState?._loadProgress();
-                              },
+                              onTap: () => _navigateToSubject('computer', _existingSubjects['computer']!),
                             ),
+                            
+                            // วิชาอิเล็กทรอนิกส์
+                            SubjectCardCentered(
+                              key: _electronicsCardKey,
+                              accent: Colors.green,
+                              icon: Icons.bolt,
+                              title: 'อิเล็กทรอนิกส์',
+                              subtitle: 'เรียนรู้พื้นฐานอิเล็กทรอนิกส์ และวงจรไฟฟ้า',
+                              subjectKey: 'electronics',
+                              onTap: () => _navigateToSubject('electronics', _existingSubjects['electronics']!),
+                            ),
+                            
+                            // วิชาใหม่แบบไดนามิก
+                            ..._dynamicSubjects.map((subject) => SubjectCardCentered(
+                              accent: subject['color'] ?? Colors.purple,
+                              icon: Icons.school,
+                              title: subject['title'],
+                              subtitle: 'บทเรียน${subject['title']}',
+                              onTap: () => _navigateToSubject(subject['id'], subject),
+                            )),
                           ],
                         );
                       },

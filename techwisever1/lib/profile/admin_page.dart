@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/user_service.dart';
+import '../services/ui_constants.dart';
 import 'admin_dashboard_page.dart';
 import 'admin_user_management_page.dart';
-import 'lesson_reset_page.dart';
+import 'admin_lesson_management_page.dart';
+import 'admin_quiz_management_page.dart';
 
 class AdminPrivilegePage extends StatelessWidget {
   const AdminPrivilegePage({super.key});
@@ -11,27 +13,30 @@ class AdminPrivilegePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: UIConstants.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 2,
+        backgroundColor: UIConstants.surfaceColor,
+        elevation: UIConstants.cardElevation,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new,
-            color: Colors.white,
+            color: UIConstants.surfaceColor,
             size: 24,
           ),
           onPressed: () => Navigator.pop(context),
           style: IconButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+            backgroundColor: UIConstants.primaryColor,
+            foregroundColor: UIConstants.surfaceColor,
             padding: const EdgeInsets.all(8),
             minimumSize: const Size(44, 44),
           ),
         ),
-        title: const Text(
+        title: Text(
           'สิทธิแอดมิน',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: UIConstants.textPrimaryColor, 
+            fontWeight: FontWeight.bold
+          ),
         ),
         centerTitle: true,
       ),
@@ -141,7 +146,61 @@ class AdminPrivilegePage extends StatelessWidget {
                 if (isAdmin) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const LessonResetPage()),
+                    MaterialPageRoute(builder: (context) => const AdminLessonManagementPage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คุณไม่มีสิทธิ์เข้าถึงฟีเจอร์นี้'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+
+          const SizedBox(height: 16),
+
+          // 🔵 ปุ่ม: สร้างบททดสอบ
+          AdminOptionButton(
+            icon: Icons.quiz,
+            label: 'สร้างบททดสอบ',
+            onTap: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final isAdmin = await UserService.isAdmin(user.uid);
+                if (isAdmin) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminQuizManagementPage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คุณไม่มีสิทธิ์เข้าถึงฟีเจอร์นี้'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+
+          const SizedBox(height: 16),
+
+          // 🔵 ปุ่ม: จัดการบททดสอบ
+          AdminOptionButton(
+            icon: Icons.manage_accounts,
+            label: 'จัดการบททดสอบ',
+            onTap: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final isAdmin = await UserService.isAdmin(user.uid);
+                if (isAdmin) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminQuizManagementPage()),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -4,6 +4,7 @@ import 'package:techwisever1/subject/select_subject_page.dart';
 import 'package:techwisever1/profile/profile_page.dart';
 import 'package:techwisever1/services/app_nav.dart';
 import 'package:techwisever1/services/auth_state_service.dart';
+import 'package:techwisever1/services/ui_constants.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -109,28 +110,53 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
+      // ✅ เพิ่ม safe area เพื่อแยกส่วนจาก status bar
+      body: SafeArea(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _screens,
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-          AppNav.bottomIndex.value = index;
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: 'บทเรียน',
+      // ✅ ใช้ UIConstants สำหรับ bottom navigation bar
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: UIConstants.surfaceColor,
+          boxShadow: UIConstants.cardShadow,
+        ),
+        child: SafeArea(
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+              AppNav.bottomIndex.value = index;
+            },
+            backgroundColor: UIConstants.surfaceColor,
+            selectedItemColor: UIConstants.primaryColor,
+            unselectedItemColor: UIConstants.textSecondaryColor,
+            selectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: UIConstants.fontSizeSmall,
+            ),
+            unselectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: UIConstants.fontSizeSmall,
+            ),
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.school, size: 24),
+                label: 'บทเรียน',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person, size: 24),
+                label: 'โปรไฟล์',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'โปรไฟล์',
-          ),
-        ],
+        ),
       ),
     );
   }

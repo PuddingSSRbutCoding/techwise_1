@@ -10,7 +10,6 @@ import '../services/profile_image_service.dart';
 import 'admin_page.dart';
 import 'user_profile_page.dart';
 import 'settings_page.dart';
-import 'lesson_reset_page.dart'; // Added import for LessonResetPage
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -165,27 +164,7 @@ class ProfilePage extends StatelessWidget {
                   },
                 ),
 
-                // แสดงปุ่มรีเซ็ตบทเรียนสำหรับแอดมิน (ซ่อนไว้เสมอ)
-                FutureBuilder<bool>(
-                  future: _checkAdminStatus(),
-                  builder: (context, snapshot) {
-                    if (snapshot.data == true) {
-                      return buildProfileMenu(
-                        icon: Icons.refresh,
-                        text: 'รีเซ็ตบทเรียน (ทดสอบ)',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LessonResetPage(),
-                            ),
-                          );
-                        },
-                      );
-                    }
-                    return const SizedBox.shrink(); // ซ่อนปุ่มถ้าไม่ใช่แอดมิน
-                  },
-                ),
+                // ลบปุ่มแยกต่างๆ ของแอดมินออกไปแล้ว - รวมอยู่ในปุ่ม "สิทธิแอดมิน" แล้ว
 
                 const Spacer(),
 
